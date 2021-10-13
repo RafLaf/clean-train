@@ -133,7 +133,7 @@ def test(model, test_loader):
 
 # function to train a model using args.epochs epochs
 # at each args.milestones, learning rate is multiplied by args.gamma
-def train_complete(model, loaders, mixup = False):
+def train_complete(model, loaders, mixup = False,i_run=0):
     global start_time
     start_time = time.time()
     
@@ -160,7 +160,7 @@ def train_complete(model, loaders, mixup = False):
         
         if (epoch + 1) > args.skip_epochs:
             if few_shot:
-                val_acc_1, test_acc_1, val_acc_5, test_acc_5 = update_few_shot_meta_data(model, test_loader, val_loader, few_shot_meta_data)
+                val_acc_1, test_acc_1, val_acc_5, test_acc_5 = update_few_shot_meta_data(model, test_loader, val_loader, few_shot_meta_data,i_run)
                 print("val-1: {:.2f}%, nov-1: {:.2f}% ({:.2f}%), val-5: {:.2f}%, nov-5: {:.2f}% ({:.2f}%)".format(100 * val_acc_1, 100 * test_acc_1, 100 * few_shot_meta_data["best_test_acc_1"], 100 * val_acc_5, 100 * test_acc_5, 100 * few_shot_meta_data["best_test_acc_5"]))
             else:
                 test_stats = test(model, test_loader)
@@ -265,7 +265,8 @@ for i in range(args.runs):
         print("Number of trainable parameters in model is: " + str(np.sum([p.numel() for p in model.parameters()])))
 
     # training
-    test_stats = train_complete(model, loaders, mixup = args.mixup)
+
+    test_stats = train_complete(model, loaders, mixup = args.mixup,i_run=i)
 
     # assemble stats
     for item in test_stats.keys():
