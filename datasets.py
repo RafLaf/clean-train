@@ -225,17 +225,18 @@ def miniImageNet(use_hd = True,i_run=0):
                         data.append(image)   
                     else:
                         data.append(path)   #here remove the class from file list 
-        if subset=='train' and False:
+        if subset=='train' and True:
 
             print('class pop',i_run)
             kill_idx = np.where(np.array(target)==i_run)
             target , data = np.array(target) , np.array(data)
             print('before',target.shape,data.shape)
             target = np.delete(target,kill_idx[0])
+            target[target>i_run]-=1
             data = np.delete(data,kill_idx[0])
             print('after',target.shape,data.shape)
-            print('should be empty', np.where(target==i_run))
             target,data=list(target), list(data)
+            
         datasets[subset] = [data, torch.LongTensor(target)]
     #print(datasets['train'])
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
@@ -244,7 +245,7 @@ def miniImageNet(use_hd = True,i_run=0):
     train_loader = iterator(datasets["train"][0], datasets["train"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
     val_loader = iterator(datasets["validation"][0], datasets["validation"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
-    return (train_loader, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
+    return (train_loader, val_loader, test_loader), [3, 84, 84], (63, 16, 20, 600), True, False
 
 import pickle
 

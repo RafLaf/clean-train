@@ -257,6 +257,31 @@ torch.backends.cudnn.benchmark = False
 for i in range(args.runs):
     if True:
         loaders, input_shape, num_classes, few_shot, top_5 = get_dataset(args.dataset,i)
+        if few_shot:
+            num_classes, val_classes, novel_classes, elements_per_class = num_classes
+            if args.dataset.lower() == "cubfs":
+                elements_val, elements_novel = elements_per_class
+            else:
+                elements_val, elements_novel = [elements_per_class] * val_classes, [elements_per_class] * novel_classes
+            print("Dataset contains",num_classes,"base classes,",val_classes,"val classes and",novel_classes,"novel classes.")
+            val_run_classes_1, val_run_indices_1 = define_runs(n_ways, 1, n_queries, val_classes, elements_val)
+            novel_run_classes_1, novel_run_indices_1 = define_runs(n_ways, 1, n_queries, novel_classes, elements_novel)
+            val_run_classes_5, val_run_indices_5 = define_runs(n_ways, 5, n_queries, val_classes, elements_val)
+            novel_run_classes_5, novel_run_indices_5 = define_runs(n_ways, 5, n_queries, novel_classes, elements_novel)
+            few_shot_meta_data = {
+                "val_run_classes_1" : val_run_classes_1,
+                "val_run_indices_1" : val_run_indices_1,
+                "novel_run_classes_1" : novel_run_classes_1,
+                "novel_run_indices_1" : novel_run_indices_1,
+                "val_run_classes_5" : val_run_classes_5,
+                "val_run_indices_5" : val_run_indices_5,
+                "novel_run_classes_5" : novel_run_classes_5,
+                "novel_run_indices_5" : novel_run_indices_5,
+                "best_val_acc_5" : 0,
+                "best_val_acc_1" : 0,
+                "best_test_acc_5" : 0,
+                "best_test_acc_1" : 0
+            }
     if not args.quiet:
         print(args)
     model = create_model()
