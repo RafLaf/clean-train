@@ -1,0 +1,58 @@
+j'ai du changer batch_few_shot_runs =10 au lieu de 100 sinon les GPUs n'avait ppas assez de mémoire
+Resultats SNR:                                                                               1-shot      5-shot
+best 1-shot pris séparément :                                                                59.09        76.07
+best 1-shot pris séparément (2) :                                                            59.09        75.99
+best1 shot concatené sur la dernière dimension (features)                                    61.00        78.25
+
+best 5-shot pris séparément :                                                                58.95        76.09
+best 5-shot pris séparément (2) :                                                            59.04        76.07
+best 5 shot concatené sur la dernière dimension (features)                                   60.99        78.23 
+
+
+(deeplearning-u20-rtx-3080) r21lafar@sl-tp-br-004:/users/local/repotest/forkvgripon/clean-train$ python main.py --test-features 'features/64featx1-2' --dataset MiniImageNet --dataset-path "/users/local/datasets/" --batch-size 32
+Using pytorch version: 1.9.1+cu111
+Importing local files...done
+
+Dataset contains 64 base classes, 16 val classes and 20 novel classes.
+Testing features of shape torch.Size([20, 600, 1280])
+1-shot: 61.00%, 5-shot: 78.25%
+(deeplearning-u20-rtx-3080) r21lafar@sl-tp-br-004:/users/local/repotest/forkvgripon/clean-train$ python main.py --test-features 'features/64featx5-2' --dataset MiniImageNet --dataset-path "/users/local/datasets/
+" --batch-size 32
+Using pytorch version: 1.9.1+cu111
+Importing local files...done
+
+Dataset contains 64 base classes, 16 val classes and 20 novel classes.
+Testing features of shape torch.Size([20, 600, 1280])
+1-shot: 60.99%, 5-shot: 78.23%
+(deeplearning-u20-rtx-3080) r21lafar@sl-tp-br-004:/users/local/repotest/forkvgripon/clean-train$ python main.py --test-features 'features/64feat01' --dataset MiniImageNet --dataset-path "/users/local/datasets/" 
+--batch-size 32
+Using pytorch version: 1.9.1+cu111
+Importing local files...done
+
+Dataset contains 64 base classes, 16 val classes and 20 novel classes.
+Testing features of shape torch.Size([20, 600, 640])
+1-shot: 59.09%, 5-shot: 76.07%
+(deeplearning-u20-rtx-3080) r21lafar@sl-tp-br-004:/users/local/repotest/forkvgripon/clean-train$ python main.py --test-features 'features/64feat11' --dataset MiniImageNet --dataset-path "/users/local/datasets/" 
+--batch-size 32
+Using pytorch version: 1.9.1+cu111
+Importing local files...done
+
+Dataset contains 64 base classes, 16 val classes and 20 novel classes.
+Testing features of shape torch.Size([20, 600, 640])
+1-shot: 59.09%, 5-shot: 75.99%
+(deeplearning-u20-rtx-3080) r21lafar@sl-tp-br-004:/users/local/repotest/forkvgripon/clean-train$ python main.py --test-features 'features/64feat05' --dataset MiniImageNet --dataset-path "/users/local/datasets/" 
+--batch-size 32
+Using pytorch version: 1.9.1+cu111
+Importing local files...done
+
+Dataset contains 64 base classes, 16 val classes and 20 novel classes.
+Testing features of shape torch.Size([20, 600, 640])
+1-shot: 58.95%, 5-shot: 76.09%
+(deeplearning-u20-rtx-3080) r21lafar@sl-tp-br-004:/users/local/repotest/forkvgripon/clean-train$ python main.py --test-features 'features/64feat15' --dataset MiniImageNet --dataset-path "/users/local/datasets/" 
+--batch-size 32
+Using pytorch version: 1.9.1+cu111
+Importing local files...done
+
+Dataset contains 64 base classes, 16 val classes and 20 novel classes.
+Testing features of shape torch.Size([20, 600, 640])
+1-shot: 59.04%, 5-shot: 76.07%

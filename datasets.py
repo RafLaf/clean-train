@@ -218,13 +218,13 @@ def miniImageNet(use_hd = True):
                     if c not in classes:
                         classes.append(c)
                     count += 1
-                    target.append(len(classes) - 1)
+                    target.append(len(classes) - 1)    #here
                     path = args.dataset_path + "miniimagenetimages/" + "images/" + fn
                     if not use_hd:
                         image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
-                        data.append(image)
+                        data.append(image)   
                     else:
-                        data.append(path)
+                        data.append(path)   #here remove from file list the class
         datasets[subset] = [data, torch.LongTensor(target)]
     print()
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))

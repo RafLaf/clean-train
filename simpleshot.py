@@ -3,7 +3,7 @@ import numpy as np
 from args import *
 
 n_runs = args.n_runs
-batch_few_shot_runs = 100
+batch_few_shot_runs = 10
 assert(n_runs % batch_few_shot_runs == 0)
 n_ways = args.n_ways
 n_queries = args.n_queries
@@ -88,7 +88,6 @@ def update_few_shot_meta_data(model, test_loader, val_loader, few_shot_meta_data
         if args.save_model != "":
             torch.save(model, args.save_model + "5")
         if args.save_features != "":
-            print('RUNfs1',i_run)
             torch.save(test_features, args.save_features + str(i_run) + "5")
         few_shot_meta_data["best_val_acc_5"] = val_acc_5
         few_shot_meta_data["best_test_acc_5"] = test_acc_5
@@ -97,7 +96,6 @@ def update_few_shot_meta_data(model, test_loader, val_loader, few_shot_meta_data
         if args.save_model != "":
             torch.save(model, args.save_model + "1")
         if args.save_features != "":
-            print('RUNfs2',i_run)
             torch.save(test_features, args.save_features + str(i_run)+ "1")
         few_shot_meta_data["best_val_acc_1"] = val_acc_1
         few_shot_meta_data["best_test_acc_1"] = test_acc_1
