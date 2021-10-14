@@ -199,7 +199,7 @@ def cifarfs(data_augmentation = True):
 
 from PIL import Image
 
-def miniImageNet(use_hd = True):
+def miniImageNet(use_hd = True,i_run=0):
     datasets = {}
     classes = []
     total = 60000
@@ -224,9 +224,20 @@ def miniImageNet(use_hd = True):
                         image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
                         data.append(image)   
                     else:
-                        data.append(path)   #here remove from file list the class
+                        data.append(path)   #here remove the class from file list 
+        if subset=='train' and False:
+
+            print('class pop',i_run)
+            kill_idx = np.where(np.array(target)==i_run)
+            target , data = np.array(target) , np.array(data)
+            print('before',target.shape,data.shape)
+            target = np.delete(target,kill_idx[0])
+            data = np.delete(data,kill_idx[0])
+            print('after',target.shape,data.shape)
+            print('should be empty', np.where(target==i_run))
+            target,data=list(target), list(data)
         datasets[subset] = [data, torch.LongTensor(target)]
-    print()
+    #print(datasets['train'])
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
     all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm)
@@ -322,7 +333,7 @@ def miniImageNet84():
     test_loader = iterator(test, test_targets, transforms = all_transforms, forcecpu = True, shuffle = False)
     return (train_loader, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
 
-def get_dataset(dataset_name):
+def get_dataset(dataset_name,i=0):
     if args.dataset.lower() == "cifar10":
         return cifar10(data_augmentation = True)
     elif args.dataset.lower() == "cifar100":
@@ -334,7 +345,7 @@ def get_dataset(dataset_name):
     elif args.dataset.lower() == "fashion":
         return fashion_mnist()
     elif args.dataset.lower() == "miniimagenet":
-        return miniImageNet()
+        return miniImageNet(i_run=i)
     elif args.dataset.lower() == "miniimagenet84":
         return miniImageNet84()
     elif args.dataset.lower() == "cubfs":

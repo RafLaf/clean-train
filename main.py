@@ -175,7 +175,7 @@ def train_complete(model, loaders, mixup = False,i_run=0):
         return test_stats
 
 ### process main arguments
-loaders, input_shape, num_classes, few_shot, top_5 = get_dataset(args.dataset)
+loaders, input_shape, num_classes, few_shot, top_5 = get_dataset(args.dataset,0)   ##################################""
 ### initialize few-shot meta data
 if few_shot:
     num_classes, val_classes, novel_classes, elements_per_class = num_classes
@@ -228,6 +228,7 @@ def create_model():
     if args.model.lower() == "wideresnet":
         return WideResNet(args.feature_maps, input_shape, few_shot, args.rotations, num_classes = num_classes).to(args.device)
     if args.model.lower() == "resnet12":
+        print(args.feature_maps, input_shape, num_classes, few_shot, args.rotations)
         return ResNet12(args.feature_maps, input_shape, num_classes, few_shot, args.rotations).to(args.device)
     if args.model.lower()[:3] == "mlp":
         return MLP(args.feature_maps, int(args.model[3:]), input_shape, num_classes, args.rotations, few_shot).to(args.device)
@@ -254,6 +255,8 @@ torch.backends.cudnn.benchmark = False
 ### here a run is a complete training of a model from scratch
 ### can be long if run is large!!!
 for i in range(args.runs):
+    if True:
+        loaders, input_shape, num_classes, few_shot, top_5 = get_dataset(args.dataset,i)
     if not args.quiet:
         print(args)
     model = create_model()
@@ -265,6 +268,7 @@ for i in range(args.runs):
         print("Number of trainable parameters in model is: " + str(np.sum([p.numel() for p in model.parameters()])))
 
     # training
+    
 
     test_stats = train_complete(model, loaders, mixup = args.mixup,i_run=i)
 
