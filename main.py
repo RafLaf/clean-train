@@ -50,7 +50,10 @@ def train(model, train_loader, optimizer, epoch, mixup = False, mm = False):
             output, features = model(data, index_mixup = index_mixup, lam = lam)
             if args.rotations:
                 output, _ = output
-            loss_mm = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
+            if args.episodic:
+                loss_mm = lam * criterion_episodic(features, target) + (1 - lam) * criterion_episodic(features, target[index_mixup])
+            else:
+                loss_mm = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
             loss_mm.backward()
 
         if args.rotations: # generate self-supervised rotations for improved universality of feature vectors
@@ -64,24 +67,33 @@ def train(model, train_loader, optimizer, epoch, mixup = False, mm = False):
             data[3*bs:] = data[3*bs:].transpose(3,2).flip(2)
             target_rot[3*bs:] = 3
 
-        if mixup and not args.episodic: # classical mixup
+        if mixup: # classical mixup
             index_mixup = torch.randperm(data.shape[0])
             lam = random.random()
             data_mixed = lam * data + (1 - lam) * data[index_mixup]
             output, features = model(data_mixed)
             if args.rotations:
                 output, output_rot = output
-                loss = ((lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])) + (lam * criterion(output_rot, target_rot) + (1 - lam) * criterion(output_rot, target_rot[index_mixup]))) / 2
-            else:
-                loss = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
-        else:
-            output, features = model(data)
-            if args.rotations and not args.episodic:
-                output, output_rot = output
-                loss = 0.5 * criterion(output, target) + 0.5 * criterion(output_rot, target_rot)
+                if args.episodic:
+                    loss = ((lam * criterion_episodic(features, target) + (1 - lam) * criterion_episodic(features, target[index_mixup])) + (lam * criterion_episodic(features_rot, target_rot) + (1 - lam) * criterion_episodic(features_rot, target_rot[index_mixup]))) / 2
+                else:
+                    loss = ((lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])) + (lam * criterion(output_rot, target_rot) + (1 - lam) * criterion(output_rot, target_rot[index_mixup]))) / 2
             else:
                 if args.episodic:
-                    loss = criterion_episodic(features)
+                    loss = lam * criterion_episodic(features, target) + (1 - lam) * criterion_episodic(features, target[index_mixup])
+                else:
+                    loss = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
+        else:
+            output, features = model(data)
+            if args.rotations:
+                output, output_rot = output
+                if args.episodic:
+                    loss = 0.5 * criterion_episodic(features, target) + 0.5 * criterion_episodic(features, target_rot)
+                else:
+                    loss = 0.5 * criterion(output, target) + 0.5 * criterion(output_rot, target_rot)
+            else:
+                if args.episodic:
+                    loss = criterion_episodic(features, target)
                 else:
                     loss = criterion(output, target)
 
@@ -146,7 +158,14 @@ def train_complete(model, loaders, mixup = False):
     else:
         optimizer = torch.optim.SGD(model.parameters(), lr = args.lr, momentum = 0.9, weight_decay = 5e-4, nesterov = True)
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = eval(args.milestones), gamma = args.gamma)
+    try:
+        milestones = int(args.milestones)
+        if milestones <= 0:
+            milestones = 1000000000
+        milestones = np.arange(milestones, args.epochs + args.manifold_mixup, milestones)
+    except:
+        milestones = eval(args.milestones)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = milestones, gamma = args.gamma)
         
     if few_shot:
         few_shot_meta_data["best_val_acc_1"] = 0
@@ -209,6 +228,8 @@ if few_shot:
         "novel_run_indices_5" : novel_run_indices_5,
         "best_val_acc_5" : 0,
         "best_val_acc_1" : 0,
+        "best_val_acc_5_ever" : 0,
+        "best_val_acc_1_ever" : 0,
         "best_test_acc_5" : 0,
         "best_test_acc_1" : 0
     }
@@ -294,16 +315,12 @@ for i in range(args.runs):
     # print stats
     print("Run", i + 1, "/", args.runs)
     if few_shot:
-        mean, low, up = stats(run_stats["best_test_acc_1"])
-        print("Top-1: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
-        mean, low, up = stats(run_stats["best_test_acc_5"])
-        print("Top-5: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
+        stats(run_stats["best_test_acc_1"], "1-shot")
+        stats(run_stats["best_test_acc_5"], "5-shot")
     else:
-        mean, low, up = stats(run_stats["test_acc"])
-        print("Top-1: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
+        stats(run_stats["test_acc"], "Top-1")
         if top_5:
-            mean, low, up = stats(run_stats["test_acc_top_5"])
-            print("Top-5: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
+            stats(run_stats["test_acc_top_5"], "Top-5")
 
 if args.output != "":
     f = open(args.output, "a")

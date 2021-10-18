@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from args import *
+from utils import *
 
 n_runs = args.n_runs
 batch_few_shot_runs = 100
@@ -29,31 +30,11 @@ def generate_runs(data, run_classes, run_indices, batch_idx):
     res = torch.gather(cclasses, 2, run_indices)
     return res
 
-def power(features):
-    return torch.pow(features, 0.5)
-
-def sphering(features):
-    return features / torch.norm(features, p = 2, dim = 2, keepdim = True)
-
-def centering(features):
-    feat = features.reshape(-1, features.shape[2])
-    feat = feat - feat.mean(dim = 0, keepdim = True)
-    features = feat.reshape(features.shape)
-    return features
-
 def ncm(features, run_classes, run_indices, n_shots):
     with torch.no_grad():
         dim = features.shape[2]
         targets = torch.arange(n_ways).unsqueeze(1).unsqueeze(0).to(args.device)
-        for i in range(len(args.preprocessing)):
-            if args.preprocessing[i] == 'R':
-                features = torch.relu(features)
-            if args.preprocessing[i] == 'P':
-                features = power(features)
-            if args.preprocessing[i] == 'E':
-                features = sphering(features)
-            if args.preprocessing[i] == 'M':
-                features = centering(features)
+        features = preprocess(features)
         score = 0
         for batch_idx in range(n_runs // batch_few_shot_runs):
             runs = generate_runs(features, run_classes, run_indices, batch_idx)
@@ -84,24 +65,28 @@ def update_few_shot_meta_data(model, test_loader, val_loader, few_shot_meta_data
     test_features = get_features(model, test_loader)
     val_acc_5, test_acc_5 = eval_few_shot(val_features, test_features, few_shot_meta_data["val_run_classes_5"], few_shot_meta_data["val_run_indices_5"], few_shot_meta_data["novel_run_classes_5"], few_shot_meta_data["novel_run_indices_5"], n_shots = 5)
     if val_acc_5 > few_shot_meta_data["best_val_acc_5"]:
-        if args.save_model != "":
-            if len(args.devices) == 1:
-                torch.save(model.state_dict(), args.save_model + "5")
-            else:
-                torch.save(model.module.state_dict(), args.save_model + "5")
-        if args.save_features != "":
-            torch.save(test_features, args.save_features + "5")
+        if val_acc_5 > few_shot_meta_data["best_val_acc_5_ever"]:
+            few_shot_meta_data["best_val_acc_5_ever"] = val_acc_5
+            if args.save_model != "":
+                if len(args.devices) == 1:
+                    torch.save(model.state_dict(), args.save_model + "5")
+                else:
+                    torch.save(model.module.state_dict(), args.save_model + "5")
+            if args.save_features != "":
+                torch.save(test_features, args.save_features + "5")
         few_shot_meta_data["best_val_acc_5"] = val_acc_5
         few_shot_meta_data["best_test_acc_5"] = test_acc_5
     val_acc_1, test_acc_1 = eval_few_shot(val_features, test_features, few_shot_meta_data["val_run_classes_1"], few_shot_meta_data["val_run_indices_1"], few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], n_shots = 1)
     if val_acc_1 > few_shot_meta_data["best_val_acc_1"]:
-        if args.save_model != "":
-            if len(args.devices) == 1:
-                torch.save(model.state_dict(), args.save_model + "1")
-            else:
-                torch.save(model.module.state_dict(), args.save_model + "1")
-        if args.save_features != "":
-            torch.save(test_features, args.save_features + "1")
+        if val_acc_1 > few_shot_meta_data["best_val_acc_1_ever"]:
+            few_shot_meta_data["best_val_acc_1_ever"] = val_acc_1
+            if args.save_model != "":
+                if len(args.devices) == 1:
+                    torch.save(model.state_dict(), args.save_model + "1")
+                else:
+                    torch.save(model.module.state_dict(), args.save_model + "1")
+            if args.save_features != "":
+                torch.save(test_features, args.save_features + "1")
         few_shot_meta_data["best_val_acc_1"] = val_acc_1
         few_shot_meta_data["best_test_acc_1"] = test_acc_1
     return val_acc_1, test_acc_1, val_acc_5, test_acc_5
