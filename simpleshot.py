@@ -73,7 +73,8 @@ def update_few_shot_meta_data(model, test_loader, val_loader, few_shot_meta_data
                 else:
                     torch.save(model.module.state_dict(), args.save_model + "5")
             if args.save_features != "":
-                torch.save(test_features, args.save_features + "5")
+                full_feat_proj = proj_class(model,test_features)
+                torch.save(full_feat_proj, args.save_features + "5")
         few_shot_meta_data["best_val_acc_5"] = val_acc_5
         few_shot_meta_data["best_test_acc_5"] = test_acc_5
     val_acc_1, test_acc_1 = eval_few_shot(val_features, test_features, few_shot_meta_data["val_run_classes_1"], few_shot_meta_data["val_run_indices_1"], few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], n_shots = 1)
@@ -86,7 +87,8 @@ def update_few_shot_meta_data(model, test_loader, val_loader, few_shot_meta_data
                 else:
                     torch.save(model.module.state_dict(), args.save_model + "1")
             if args.save_features != "":
-                torch.save(test_features, args.save_features + "1")
+                full_feat_proj = proj_class(model,test_features)
+                torch.save(full_feat_proj, args.save_features + "1")
         few_shot_meta_data["best_val_acc_1"] = val_acc_1
         few_shot_meta_data["best_test_acc_1"] = test_acc_1
     return val_acc_1, test_acc_1, val_acc_5, test_acc_5
