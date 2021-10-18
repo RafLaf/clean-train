@@ -47,11 +47,13 @@ def train(model, train_loader, optimizer, epoch, mixup = False, mm = False):
             index_mixup = torch.cat(new_chunks, dim = 0)
             #index_mixup = torch.randperm(data.shape[0])
             lam = np.random.beta(2, 2)
-            depth = random.randint(0, 3)
-            output, _ = model(data, mixup_layer = depth, index_mixup = index_mixup, lam = lam)
+            output, features = model(data, index_mixup = index_mixup, lam = lam)
             if args.rotations:
                 output, _ = output
-            loss_mm = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
+            if args.episodic:
+                loss_mm = lam * criterion_episodic(features, target) + (1 - lam) * criterion_episodic(features, target[index_mixup])
+            else:
+                loss_mm = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
             loss_mm.backward()
 
         if args.rotations: # generate self-supervised rotations for improved universality of feature vectors
@@ -69,19 +71,31 @@ def train(model, train_loader, optimizer, epoch, mixup = False, mm = False):
             index_mixup = torch.randperm(data.shape[0])
             lam = random.random()
             data_mixed = lam * data + (1 - lam) * data[index_mixup]
-            output, _ = model(data_mixed)
+            output, features = model(data_mixed)
             if args.rotations:
                 output, output_rot = output
-                loss = ((lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])) + (lam * criterion(output_rot, target_rot) + (1 - lam) * criterion(output_rot, target_rot[index_mixup]))) / 2
+                if args.episodic:
+                    loss = ((lam * criterion_episodic(features, target) + (1 - lam) * criterion_episodic(features, target[index_mixup])) + (lam * criterion_episodic(features_rot, target_rot) + (1 - lam) * criterion_episodic(features_rot, target_rot[index_mixup]))) / 2
+                else:
+                    loss = ((lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])) + (lam * criterion(output_rot, target_rot) + (1 - lam) * criterion(output_rot, target_rot[index_mixup]))) / 2
             else:
-                loss = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
+                if args.episodic:
+                    loss = lam * criterion_episodic(features, target) + (1 - lam) * criterion_episodic(features, target[index_mixup])
+                else:
+                    loss = lam * criterion(output, target) + (1 - lam) * criterion(output, target[index_mixup])
         else:
-            output, _ = model(data)
+            output, features = model(data)
             if args.rotations:
                 output, output_rot = output
-                loss = 0.5 * criterion(output, target) + 0.5 * criterion(output_rot, target_rot)
+                if args.episodic:
+                    loss = 0.5 * criterion_episodic(features, target) + 0.5 * criterion_episodic(features, target_rot)
+                else:
+                    loss = 0.5 * criterion(output, target) + 0.5 * criterion(output_rot, target_rot)
             else:
-                loss = criterion(output, target)
+                if args.episodic:
+                    loss = criterion_episodic(features, target)
+                else:
+                    loss = criterion(output, target)
 
         # backprop loss
         loss.backward()
@@ -144,7 +158,14 @@ def train_complete(model, loaders, mixup = False,i_run=0):
     else:
         optimizer = torch.optim.SGD(model.parameters(), lr = args.lr, momentum = 0.9, weight_decay = 5e-4, nesterov = True)
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = eval(args.milestones), gamma = args.gamma)
+    try:
+        milestones = int(args.milestones)
+        if milestones <= 0:
+            milestones = 1000000000
+        milestones = np.arange(milestones, args.epochs + args.manifold_mixup, milestones)
+    except:
+        milestones = eval(args.milestones)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = milestones, gamma = args.gamma)
         
     if few_shot:
         few_shot_meta_data["best_val_acc_1"] = 0
@@ -156,7 +177,10 @@ def train_complete(model, loaders, mixup = False,i_run=0):
         scheduler.step()
         
         if args.save_model != "" and not few_shot:
-            torch.save(model, args.save_model)
+            if len(args.devices) == 1:
+                torch.save(model.state_dict(), args.save_model)
+            else:
+                torch.save(model.module.state_dict(), args.save_model)
         
         if (epoch + 1) > args.skip_epochs:
             if few_shot:
@@ -184,10 +208,15 @@ if few_shot:
     else:
         elements_val, elements_novel = [elements_per_class] * val_classes, [elements_per_class] * novel_classes
     print("Dataset contains",num_classes,"base classes,",val_classes,"val classes and",novel_classes,"novel classes.")
+    print("Generating runs... ", end='')
     val_run_classes_1, val_run_indices_1 = define_runs(n_ways, 1, n_queries, val_classes, elements_val)
+    print("val-1, ", end='')
     novel_run_classes_1, novel_run_indices_1 = define_runs(n_ways, 1, n_queries, novel_classes, elements_novel)
+    print("nov-1, ", end='')
     val_run_classes_5, val_run_indices_5 = define_runs(n_ways, 5, n_queries, val_classes, elements_val)
+    print("val-5, ", end='')
     novel_run_classes_5, novel_run_indices_5 = define_runs(n_ways, 5, n_queries, novel_classes, elements_novel)
+    print("nov-5.")
     few_shot_meta_data = {
         "val_run_classes_1" : val_run_classes_1,
         "val_run_indices_1" : val_run_indices_1,
@@ -199,6 +228,8 @@ if few_shot:
         "novel_run_indices_5" : novel_run_indices_5,
         "best_val_acc_5" : 0,
         "best_val_acc_1" : 0,
+        "best_val_acc_5_ever" : 0,
+        "best_val_acc_1_ever" : 0,
         "best_test_acc_5" : 0,
         "best_test_acc_1" : 0
     }
@@ -233,12 +264,9 @@ def create_model():
         return MLP(args.feature_maps, int(args.model[3:]), input_shape, num_classes, args.rotations, few_shot).to(args.device)
     if args.model.lower() == "s2m2r":
         return S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
-    
-if args.load_model != "":
-    model = torch.load(args.load_model).to(args.device)
 
 if args.test_features != "":
-    test_features = torch.load(args.test_features)
+    test_features = torch.load(args.test_features).to(args.dataset_device)
     print("Testing features of shape", test_features.shape)
     perf1 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], 1)
     perf5 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_5"], few_shot_meta_data["novel_run_indices_5"], 5)
@@ -249,14 +277,18 @@ random.seed(args.seed)
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed_all(args.seed)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+if args.deterministic:
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 ### here a run is a complete training of a model from scratch
 ### can be long if run is large!!!
 for i in range(args.runs):
     if not args.quiet:
         print(args)
     model = create_model()
+    if args.load_model != "":
+        model.load_state_dict(torch.load(args.load_model, map_location=torch.device(args.device)))
+        model.to(args.device)
 
     if len(args.devices) > 1:
         model = torch.nn.DataParallel(model, device_ids = args.devices)
@@ -284,16 +316,12 @@ for i in range(args.runs):
     # print stats
     print("Run", i + 1, "/", args.runs)
     if few_shot:
-        mean, low, up = stats(run_stats["best_test_acc_1"])
-        print("Top-1: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
-        mean, low, up = stats(run_stats["best_test_acc_5"])
-        print("Top-5: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
+        stats(run_stats["best_test_acc_1"], "1-shot")
+        stats(run_stats["best_test_acc_5"], "5-shot")
     else:
-        mean, low, up = stats(run_stats["test_acc"])
-        print("Top-1: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
+        stats(run_stats["test_acc"], "Top-1")
         if top_5:
-            mean, low, up = stats(run_stats["test_acc_top_5"])
-            print("Top-5: {:.2f} (conf: [{:.2f}, {:.2f}])".format(100 * mean, 100 * low, 100 * up))
+            stats(run_stats["test_acc_top_5"], "Top-5")
 
 if args.output != "":
     f = open(args.output, "a")

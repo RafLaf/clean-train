@@ -23,7 +23,7 @@ class BasicBlock(nn.Module):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
-        return F.relu(out)
+        return out
 
 class ResNet(nn.Module):
     def __init__(self, block, num_blocks, feature_maps, input_shape, num_classes, few_shot, rotations):
@@ -37,8 +37,7 @@ class ResNet(nn.Module):
             layers.append(self._make_layer(block, (2 ** i) * feature_maps, nb, stride = 1 if i == 0 else 2))
         self.layers = nn.Sequential(*layers)
         self.linear = linear((2 ** (len(num_blocks) - 1)) * feature_maps, num_classes)
-        if rotations:
-            self.linear_rot = linear((2 ** (len(num_blocks) - 1)) * feature_maps, 4)
+        self.linear_rot = nn.Linear((2 ** (len(num_blocks) - 1)) * feature_maps, 4)
         self.rotations = rotations
         self.depth = len(num_blocks)
 
@@ -48,12 +47,25 @@ class ResNet(nn.Module):
         for i in range(len(strides)):
             stride = strides[i]
             layers.append(block(self.in_planes, planes, stride))
+            if i < len(strides) - 1:
+                layers.append(nn.ReLU())
             self.in_planes = planes
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, index_mixup = None, lam = -1):
+        if lam != -1:
+            mixup_layer = random.randint(0, len(self.layers))
+        else:
+            mixup_layer = -1
+        out = x
+        if mixup_layer == 0:
+            out = lam * out + (1 - lam) * out[index_mixup]
         out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layers(out)
+        for i in range(len(self.layers)):
+            out = self.layers[i](out)
+            if mixup_layer == i + 1:
+                out = lam * out + (1 - lam) * out[index_mixup]
+            out = F.relu(out)
         out = F.avg_pool2d(out, out.shape[2])
         features = out.view(out.size(0), -1)
         out = self.linear(features)
