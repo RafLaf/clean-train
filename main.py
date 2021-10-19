@@ -267,7 +267,7 @@ def create_model():
 
 if args.test_features != "":
     full_test_features = torch.load(args.test_features).to(args.dataset_device)
-    if True:
+    if False:
         for i in range(full_test_features.shape[0]):
             test_features=full_test_features[i]
             #print("Testing features of shape", test_features.shape )
@@ -284,6 +284,13 @@ if args.test_features != "":
         perf1 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], 1)
         perf5 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_5"], few_shot_meta_data["novel_run_indices_5"], 5)
         print("1-shot: {:.2f}%, 5-shot: {:.2f}%".format(perf1, perf5), 'concatenated')
+    if True:
+        s=full_test_features.shape
+        test_features=full_test_features.sum(axis=0)
+        print(test_features.device)
+        perf1 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], 1)
+        perf5 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_5"], few_shot_meta_data["novel_run_indices_5"], 5)
+        print("1-shot: {:.2f}%, 5-shot: {:.2f}%".format(perf1, perf5), 'summed')
 
     sys.exit()
 
