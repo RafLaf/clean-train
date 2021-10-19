@@ -74,16 +74,16 @@ def preprocess(features):
     return features
    
 def proj_class(model,test_features):
-    last_layer_weights=model.linear.weight
-    for i in range (last_layer_weights.shape[0]):
-        w=last_layer_weights[i]
-        proj = torch.matmul(test_features,w)/ torch.norm(w)**2 
-        projection_ortho=proj.unsqueeze(2).repeat(1,1,640)
-        projection_ortho = projection_ortho * w
-        projection_ortho =  test_features - projection_ortho
+    last_layer_weights=model.linear.weight                        #get classifier weight (last layer of resnet12)
+    for i in range (last_layer_weights.shape[0]):                 #one projection per 64 clesses on miniimagenet
+        w=last_layer_weights[i]                                   #select weights of the i-th class
+        proj = torch.matmul(test_features,w)/ torch.norm(w)**2    #get coef of projection and normalize
+        projection_ortho = proj.unsqueeze(2).repeat(1,1,640)      
+        projection_ortho = projection_ortho * w                   #vector of projection along w 
+        projection_ortho = test_features - projection_ortho       #projection on the orthogonal space of w
         if i==0:
-            full_projection_ortho=test_features.unsqueeze(0).to('cpu')
-            full_projection_ortho=torch.cat((full_projection_ortho,projection_ortho.unsqueeze(0).to('cpu')),dim=0)
+            full_projection_ortho=test_features.unsqueeze(0).to('cpu')                #save natural test features                            
+            full_projection_ortho=torch.cat((full_projection_ortho,projection_ortho.unsqueeze(0).to('cpu')),dim=0) #add projections
         else:
-            full_projection_ortho=torch.cat((full_projection_ortho,projection_ortho.unsqueeze(0).to('cpu')),dim=0)
+            full_projection_ortho=torch.cat((full_projection_ortho,projection_ortho.unsqueeze(0).to('cpu')),dim=0) #add projections
     return full_projection_ortho
