@@ -1,0 +1,7 @@
+Using pytorch version: 1.9.1+cu111
+Importing local files...done
+
+Dataset contains 64 base classes, 16 val classes and 20 novel classes.
+Generating runs... val-1, nov-1, val-5, nov-5.
+cuda:0
+1-shot: 59.52%, 5-shot: 76.57% summed
