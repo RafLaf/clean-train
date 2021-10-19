@@ -266,11 +266,25 @@ def create_model():
         return S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
 if args.test_features != "":
-    test_features = torch.load(args.test_features).to(args.dataset_device)
-    print("Testing features of shape", test_features.shape)
-    perf1 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], 1)
-    perf5 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_5"], few_shot_meta_data["novel_run_indices_5"], 5)
-    print("1-shot: {:.2f}%, 5-shot: {:.2f}%".format(perf1, perf5))
+    full_test_features = torch.load(args.test_features).to(args.dataset_device)
+    if True:
+        for i in range(full_test_features.shape[0]):
+            test_features=full_test_features[i]
+            #print("Testing features of shape", test_features.shape )
+            perf1 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], 1)
+            perf5 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_5"], few_shot_meta_data["novel_run_indices_5"], 5)
+            if i==0:
+                print("1-shot: {:.2f}%, 5-shot: {:.2f}%".format(perf1, perf5), 'no projection')
+            else:
+                print("1-shot: {:.2f}%, 5-shot: {:.2f}%".format(perf1, perf5), 'projection',i)
+    if False:
+        s=full_test_features.shape
+        test_features=full_test_features.reshape((s[1],s[2],s[0]*s[3]))
+        print(test_features.device)
+        perf1 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_1"], few_shot_meta_data["novel_run_indices_1"], 1)
+        perf5 = 100 * ncm(test_features, few_shot_meta_data["novel_run_classes_5"], few_shot_meta_data["novel_run_indices_5"], 5)
+        print("1-shot: {:.2f}%, 5-shot: {:.2f}%".format(perf1, perf5), 'concatenated')
+
     sys.exit()
 
 random.seed(args.seed)
