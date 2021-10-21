@@ -75,6 +75,7 @@ def preprocess(features):
    
 def proj_class(model,test_features):
     last_layer_weights=model.linear.weight                        #get classifier weight (last layer of resnet12)
+    torch.save(last_layer_weights,'exp_proj/classifier' )
     for i in range (last_layer_weights.shape[0]):                 #one projection per 64 clesses on miniimagenet
         w=last_layer_weights[i]                                   #select weights of the i-th class
         proj = torch.matmul(test_features,w)/ torch.norm(w)**2    #get coef of projection and normalize

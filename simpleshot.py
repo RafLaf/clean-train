@@ -30,7 +30,7 @@ def generate_runs(data, run_classes, run_indices, batch_idx):
     res = torch.gather(cclasses, 2, run_indices)
     return res
 
-def ncm(features, run_classes, run_indices, n_shots,i_proj):
+def ncm(features, run_classes, run_indices, n_shots,i_proj=0):
     with torch.no_grad():
         dim = features.shape[2]
         targets = torch.arange(n_ways).unsqueeze(1).unsqueeze(0).to(args.device)
@@ -45,15 +45,19 @@ def ncm(features, run_classes, run_indices, n_shots,i_proj):
             accuracy = (winners == targets).float().mean(2)
             if batch_idx==0:
                 full_accuracy=accuracy
+                full_mean=means
             else:
                 full_accuracy=torch.cat((full_accuracy,accuracy),dim=0)
+                full_mean=torch.cat((full_mean,means),dim=0)
             
             score += (winners == targets).float().mean().item()
         total = torch.cat(( run_classes.unsqueeze(0) ,full_accuracy.unsqueeze(0) ))
         if n_shots==5:
             torch.save(total , 'exp_proj/chunks/class_accuracy_5shots'+str(i_proj))
+            torch.save(full_mean , 'exp_proj/chunks/mean_5shots'+str(i_proj))
         if n_shots==1:
             torch.save(total , 'exp_proj/chunks/class_accuracy_1shots'+str(i_proj))
+            torch.save(full_mean , 'exp_proj/chunks/mean_1shots'+str(i_proj))
         return score / (batch_idx + 1)
 
 def get_features(model, loader):
