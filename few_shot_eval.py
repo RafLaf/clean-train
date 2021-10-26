@@ -73,8 +73,8 @@ def get_features(model, loader):
     print(".", end='')
     return torch.cat(all_features, dim = 0).reshape(num_classes, -1, all_features[0].shape[1])
 
-def eval_few_shot(train_features, val_features, novel_features, val_run_classes, val_run_indices, novel_run_classes, novel_run_indices, n_shots):
-    return ncm(train_features, val_features, val_run_classes, val_run_indices, n_shots), ncm(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots)
+def eval_few_shot(train_features, val_features, novel_features, val_run_classes, val_run_indices, novel_run_classes, novel_run_indices, n_shots,i_proj):
+    return ncm(train_features, val_features, val_run_classes, val_run_indices, n_shots,i_proj), ncm(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots,i_proj)
 
 def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data):
 
@@ -91,16 +91,20 @@ def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_
 
     return res
 
-def evaluate_shot(index, train_features, val_features, novel_features, few_shot_meta_data, model = None):
-    (val_acc, val_conf), (novel_acc, novel_conf) = eval_few_shot(train_features, val_features, novel_features, few_shot_meta_data["val_run_classes"][index], few_shot_meta_data["val_run_indices"][index], few_shot_meta_data["novel_run_classes"][index], few_shot_meta_data["novel_run_indices"][index], args.n_shots[index])
+def evaluate_shot(index, train_features, val_features, novel_features, few_shot_meta_data, model = None, i_proj=0):
+    (val_acc, val_conf), (novel_acc, novel_conf) = eval_few_shot(train_features, val_features, novel_features, few_shot_meta_data["val_run_classes"][index], few_shot_meta_data["val_run_indices"][index], few_shot_meta_data["novel_run_classes"][index], few_shot_meta_data["novel_run_indices"][index], args.n_shots[index],i_proj)
     if val_acc > few_shot_meta_data["best_val_acc"][index]:
         if val_acc > few_shot_meta_data["best_val_acc_ever"][index]:
             few_shot_meta_data["best_val_acc_ever"][index] = val_acc
             if args.save_model != "":
                 if len(args.devices) == 1:
                     torch.save(model.state_dict(), args.save_model + str(args.n_shots[index]))
+                    last_layer_weights=model.linear.weight                        #get classifier weight (last layer of resnet12)
+                    torch.save(last_layer_weights,args.save_classifier )
                 else:
                     torch.save(model.module.state_dict(), args.save_model + str(args.n_shots[index]))
+                    last_layer_weights=model.linear.weight                        #get classifier weight (last layer of resnet12)
+                    torch.save(last_layer_weights,args.save_classifier )
             if args.save_features != "":
                 torch.save(torch.cat([train_features, val_features, novel_features], dim = 0), args.save_features + str(args.n_shots[index]))
         few_shot_meta_data["best_val_acc"][index] = val_acc

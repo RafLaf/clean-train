@@ -171,8 +171,12 @@ def train_complete(model, loaders, mixup = False):
         if args.save_model != "" and not few_shot:
             if len(args.devices) == 1:
                 torch.save(model.state_dict(), args.save_model)
+                last_layer_weights=model.linear.weight                        #get classifier weight (last layer of resnet12)
+                torch.save(last_layer_weights,'exp_proj/'+args.save_model+'classifier' )
             else:
                 torch.save(model.module.state_dict(), args.save_model)
+                last_layer_weights=model.linear.weight                        #get classifier weight (last layer of resnet12)
+                torch.save(last_layer_weights,'exp_proj/'+args.save_model+'classifier')
         
         if (epoch + 1) > args.skip_epochs:
             if few_shot:
@@ -257,12 +261,14 @@ def create_model():
 
 if args.test_features != "":
     full_test_features = torch.load(args.test_features).to(args.dataset_device)
+    classifier = torch.load(args.load_classifier).to(args.dataset_device)
     if True:
-        for i_proj in range(full_test_features.shape[0]):
+        for i_proj in range(65):
+            test_features = proj_class(classifier,full_test_features,i=i_proj)
             print("Testing features of shape", test_features.shape)
-            train_features = full_test_features[i_proj,:num_classes]
-            val_features = full_test_features[i_proj,num_classes:num_classes + val_classes]
-            test_features = full_test_features[i_proj,num_classes + val_classes:]
+            train_features = full_test_features[:num_classes]
+            val_features = full_test_features[num_classes:num_classes + val_classes]
+            test_features = full_test_features[num_classes + val_classes:]
             #print("Testing features of shape", test_features.shape )
             for i in range(len(args.n_shots)):
                 val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, novel_features, few_shot_meta_data,i_proj)
