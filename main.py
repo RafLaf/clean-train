@@ -265,13 +265,13 @@ if args.test_features != "":
     if True:
         for i_proj in range(65):
             test_features = proj_class(classifier,full_test_features,i=i_proj)
-            print("Testing features of shape", test_features.shape)
+            print("Testing features of shape", test_features.shape, 'projection', i_proj-1 , '(-1 is no projection)')
             train_features = full_test_features[:num_classes]
             val_features = full_test_features[num_classes:num_classes + val_classes]
             test_features = full_test_features[num_classes + val_classes:]
             #print("Testing features of shape", test_features.shape )
             for i in range(len(args.n_shots)):
-                val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, novel_features, few_shot_meta_data,i_proj)
+                val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data,i_proj)
                 print("{:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
     sys.exit()
 

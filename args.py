@@ -70,6 +70,8 @@ parser.add_argument("--test-features", type=str, default="", help="test features
 parser.add_argument("--load-model", type=str, default="", help="load model from file")
 parser.add_argument("--save-classifier", type=str, default="", help="save classifier from file")
 parser.add_argument("--load-classifier", type=str, default="", help="load classifier from file")
+parser.add_argument("--save-accuracy", type=str, default="", help="save classifier from file")
+
 parser.add_argument("--seed", type=int, default=-1, help="set random seed manually, and also use deterministic approach")
 
 ### few-shot parameters

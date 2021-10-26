@@ -50,13 +50,11 @@ def ncm(train_features, features, run_classes, run_indices, n_shots,i_proj=0):
             
             score += (winners == targets).float().mean().item()
         total = torch.cat(( run_classes.unsqueeze(0) ,full_accuracy.unsqueeze(0) ))
-        if n_shots==5:
-            torch.save(total , 'exp_proj/chunks/class_accuracy_5shots'+str(i_proj))
-            torch.save(full_mean , 'exp_proj/chunks/mean_5shots'+str(i_proj))
-        if n_shots==1:
-            torch.save(total , 'exp_proj/chunks/class_accuracy_1shots'+str(i_proj))
-            torch.save(full_mean , 'exp_proj/chunks/mean_1shots'+str(i_proj))
-            scores += list((winners == targets).float().mean(dim = 1).mean(dim = 1).to("cpu").numpy())
+       
+        torch.save(total , args.save_accuracy+str(n_shots)+'shots'+str(i_proj+1))
+        torch.save(run_indices , args.save_accuracy+'idx'+str(n_shots)+'shots'+str(i_proj+1))
+
+        scores += list((winners == targets).float().mean(dim = 1).mean(dim = 1).to("cpu").numpy())
         return stats(scores, "")
 
 def get_features(model, loader):
