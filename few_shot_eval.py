@@ -28,7 +28,7 @@ def generate_runs(data, run_classes, run_indices, batch_idx):
     res = torch.gather(cclasses, 2, run_indices)
     return res
 
-def ncm(train_features, features, run_classes, run_indices, n_shots,i_proj=0):
+def ncm(train_features, features, run_classes, run_indices, n_shots,i_proj):
     with torch.no_grad():
         dim = features.shape[2]
         targets = torch.arange(args.n_ways).unsqueeze(1).unsqueeze(0).to(args.device)
@@ -50,7 +50,6 @@ def ncm(train_features, features, run_classes, run_indices, n_shots,i_proj=0):
             
             score += (winners == targets).float().mean().item()
         total = torch.cat(( run_classes.unsqueeze(0) ,full_accuracy.unsqueeze(0) ))
-       
         torch.save(total , args.save_accuracy+str(n_shots)+'shots'+str(i_proj+1))
         torch.save(run_indices , args.save_accuracy+'idx'+str(n_shots)+'shots'+str(i_proj+1))
 
@@ -68,7 +67,6 @@ def get_features(model, loader):
             offset = min(min(target), offset)
             max_offset = max(max(target), max_offset)
     num_classes = max_offset - offset + 1
-    print(".", end='')
     return torch.cat(all_features, dim = 0).reshape(num_classes, -1, all_features[0].shape[1])
 
 def eval_few_shot(train_features, val_features, novel_features, val_run_classes, val_run_indices, novel_run_classes, novel_run_indices, n_shots,i_proj):

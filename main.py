@@ -271,7 +271,8 @@ if args.test_features != "":
             test_features = full_test_features[num_classes + val_classes:]
             #print("Testing features of shape", test_features.shape )
             for i in range(len(args.n_shots)):
-                val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data,i_proj)
+                print('main', i_proj)
+                val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data,i_proj=i_proj)
                 print("{:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
     sys.exit()
 
