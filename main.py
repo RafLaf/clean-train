@@ -7,6 +7,7 @@ import math
 import time
 import random
 import sys
+import copy
 print("Using pytorch version: " + torch.__version__)
 
 ### local imports
@@ -23,14 +24,13 @@ import mlp
 
 import wandb
 
-import wandb
-
-wandb.init(project="cleantrain", 
+if args.wandb:
+    wandb.init(project="cleantrain", 
            entity="raflaf", 
            tags=['Test', args.dataset], 
            notes=str(vars(args))
            )
-wandb.config = {
+    wandb.config = {
   "learning_rate": args.lr,
   "epochs": args.epochs,
   "batch_size": args.batch_size,
@@ -138,7 +138,8 @@ def train(model, train_loader, optimizer, epoch, mixup = False, mm = False):
             else:
                 print("\r{:4d} loss: {:.5f} ".format(epoch, losses / total), end = '')
             last_update = time.time()
-    wandb.log({"epoch":epoch, "train_loss": losses / total})
+    if args.wandb:
+        wandb.log({"epoch":epoch, "train_loss": losses / total})
     # return train_loss
     return { "train_loss" : losses / total}
 
@@ -168,12 +169,8 @@ def test(model, test_loader):
                         accuracy_top_5 += 1
             # count total number of samples for averaging in the end
             total += target.shape[0]
-<<<<<<< HEAD
-    wandb.log({ "test_loss" : test_loss / total, "test_acc" : accuracy / total, "test_acc_top_5" : accuracy_top_5 / total})
-=======
         if args.ema > 0:
             ema.restore()
->>>>>>> b69464c571d62dfbad7990a1363d8fc77b30f9f5
     # return results
     model.train()
     return { "test_loss" : test_loss / total, "test_acc" : accuracy / total, "test_acc_top_5" : accuracy_top_5 / total}
@@ -225,7 +222,8 @@ def train_complete(model, loaders, mixup = False):
                     ema.restore()
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
-                    wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2]})
+                    if args.wandb:
+                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2]})
                 print()
             else:
                 test_stats = test(model, test_loader)
@@ -327,21 +325,30 @@ for i in range(args.runs):
 
     if not args.quiet:
         print(args)
-<<<<<<< HEAD
-=======
         
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
->>>>>>> b69464c571d62dfbad7990a1363d8fc77b30f9f5
-
-    wandb.log({"run": i})
+    if args.wandb:
+        wandb.log({"run": i})
     model = create_model()
     # Optional
-    
     if args.load_model != "":
         model.load_state_dict(torch.load(args.load_model, map_location=torch.device(args.device)))
         model.to(args.device)
+    elif args.mean_model!="":
+        L=[]
+        for fil in args.mean_model:
+                L.append(torch.load(fil, map_location=args.device))
+        new_model = copy.deepcopy(L[0])
+        for key in new_model.keys():
+            new_model[key] = (L[0][key]+L[1][key])/2
+        print("mean model used")
+        model.load_state_dict(new_model)
+        model.to(args.device)
+
+
+
 
     if len(args.devices) > 1:
         model = torch.nn.DataParallel(model, device_ids = args.devices)
@@ -370,13 +377,14 @@ for i in range(args.runs):
     if few_shot:
         for index in range(len(args.n_shots)):
             stats(np.array(run_stats["best_novel_acc"])[:,index], "{:d}-shot".format(args.n_shots[index]))
-            wandb.log({"run": i+1,"test acc {:d}-shot".format(args.n_shots[index]):np.mean(np.array(run_stats["best_novel_acc"])[:,index])})
+            if args.wandb:
+                wandb.log({"run": i+1,"test acc {:d}-shot".format(args.n_shots[index]):np.mean(np.array(run_stats["best_novel_acc"])[:,index])})
     else:
         stats(run_stats["test_acc"], "Top-1")
         if top_5:
             stats(run_stats["test_acc_top_5"], "Top-5")
-
-wandb.watch(model)
+if args.wandb:
+    wandb.watch(model)
 
 if args.output != "":
     f = open(args.output, "a")
