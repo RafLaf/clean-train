@@ -25,7 +25,7 @@ class CPUDataset():
         return self.transforms(elt), self.targets[idx]
     def __len__(self):
         return self.length
-
+        
 class EpisodicCPUDataset():
     def __init__(self, data, num_classes, transforms = [], episode_size = args.batch_size, use_hd = False):
         self.data = data
@@ -88,7 +88,7 @@ class Dataset():
     def __iter__(self):
         if self.shuffle:
             self.permutation = torch.randperm(self.length)
-        for i in range(self.length // self.batch_size + (1 if self.length % self.batch_size != 0 else 0)):
+        for i in range(self.n_batches):
             if torch.is_tensor(self.data):
                 yield self.transforms(self.data[self.permutation[i * self.batch_size : (i+1) * self.batch_size]]), self.targets[self.permutation[i * self.batch_size : (i+1) * self.batch_size]]
             else:
@@ -236,57 +236,61 @@ def cifar100(data_augmentation = True):
     loaders = create_dataset(train_data, test_data, train_targets, test_targets, list_trans_train, norm)
     return loaders, train_data.shape[1:], torch.max(train_targets).item() + 1, False, True
 
-def cifarfs(data_augmentation = True):
-    novel_labels = ["baby","bed","bicycle","chimpanzee","fox","leopard","man","pickup_truck","plain","poppy","rocket","rose","snail","sweet_pepper","table","telephone","wardrobe","whale","woman","worm"]
-    val_labels = ["otter","motorcycle","television","lamp","crocodile","shark","butterfly","beaver","beetle","tractor","flatfish","maple_tree","camel","crab","sea","cattle"]
-    data_train = datasets.CIFAR100(args.dataset_path, train=True, download=True)
-    data_val = datasets.CIFAR100(args.dataset_path, train=False, download=True)
-    all_data = torch.cat([torch.stack(list(map(transforms.ToTensor(), data_train.data))), torch.stack(list(map(transforms.ToTensor(), data_val.data)))], dim = 0)
-    all_labels = torch.cat([torch.LongTensor(data_train.targets), torch.LongTensor(data_val.targets)], dim = 0)
-    novel_targets = [data_train.class_to_idx[label] for label in novel_labels]    
-    val_targets = [data_train.class_to_idx[label] for label in val_labels]
-    train_targets = [x for x in np.arange(100) if x not in novel_targets and x not in val_targets]
-    new_labels = torch.zeros(all_labels.shape, dtype=torch.long)
-    index = 0
-    for dataset in [train_targets, val_targets, novel_targets]:
-        for i in dataset:
-            new_labels[np.where(all_labels == i)] = index
-            index += 1
-    all_labels = new_labels
-    novel_targets = np.arange(80, 100)
-    val_targets = np.arange(64, 80)
-    train_targets = np.arange(0, 64)
-    train_data = all_data[torch.where(all_labels < 64)[0]]
-    train_targets = all_labels[torch.where(all_labels < 64)[0]]
-    remaining_data = all_data[torch.where(all_labels >= 64)[0]]
-    remaining_labels = all_labels[torch.where(all_labels >= 64)[0]]
-    val_data = remaining_data[torch.where(remaining_labels < 80)[0]]
-    val_targets = remaining_labels[torch.where(remaining_labels < 80)[0]]
-    test_data = all_data[torch.where(all_labels >= 80)[0]]
-    test_targets = all_labels[torch.where(all_labels >= 80)[0]]
+from PIL import Image
 
-    train_data = torch.cat([train_data[torch.where(train_targets == i)] for i in range(64)], dim = 0)
-    val_data = torch.cat([val_data[torch.where(val_targets == i)] for i in range(64, 80)], dim = 0)
-    test_data = torch.cat([test_data[torch.where(test_targets == i)] for i in range(80, 100)], dim = 0)
-    train_targets = torch.repeat_interleave(torch.arange(64), 600)
-    val_targets = torch.repeat_interleave(torch.arange(64, 80), 600)
-    test_targets = torch.repeat_interleave(torch.arange(80, 100), 600)
-    
+def cifarfs(use_hd=True, data_augmentation=True):
+    """
+    CIFAR FS dataset
+    Number of classes : 
+    - train: 64
+    - val  : 16
+    - novel: 20
+    Number of samples per class: exactly 600
+    Total number of images: 60000
+    Images size : 32x32
+    """
+    datasets = {}
+    classes = []
+    total = 60000
+    buffer = {'train':0, 'val':64, 'test':64+16}
+    for metaSub in ["meta-train", "meta-val", "meta-test"]:
+        subset = metaSub.split('-')[-1]
+        data = []
+        target = []
+        subset_path = os.path.join(args.dataset_path, 'cifar_fs', metaSub)
+        classe_files = os.listdir(subset_path)
+        
+        for c, classe in enumerate(classe_files):
+            files = os.listdir(os.path.join(subset_path, classe))
+            count = 0
+            for file in files:
+                count += 1
+                target.append(c+buffer[subset])
+             
+                path = os.path.join(subset_path, classe, file)
+                if not use_hd:
+                    image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
+                    data.append(image)
+                else:
+                    data.append(path)
+                  
+        datasets[subset] = [data, torch.LongTensor(target)]
+            
+    assert (len(datasets['train'][0])+len(datasets['val'][0])+len(datasets['test'][0])==total), 'Total number of sample per class is not 600'
+    print()
     norm = transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762))
     if data_augmentation:
-        list_trans_train = torch.nn.Sequential(transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), norm)
+        train_transforms = torch.nn.Sequential(transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip(), norm)
     else:
-        list_trans_train = norm
+        train_transforms = norm
     if args.episodic:
-        train_loader = episodic_iterator(train_data, 64, transforms = list_trans_train)
+        train_loader = episodic_iterator(datasets['train'][0], 64, transforms = train_transforms, forcecpu=True, use_hd=True)
     else:
-        train_loader = iterator(train_data, train_targets, transforms = list_trans_train)
-    train_clean = iterator(train_data, train_targets, transforms = norm, shuffle = False)
-    val_loader = iterator(val_data, val_targets, transforms = norm, shuffle = False)
-    test_loader = iterator(test_data, test_targets, transforms = norm, shuffle = False)
+        train_loader = iterator(datasets['train'][0], datasets['train'][1], transforms = train_transforms, forcecpu=True, use_hd = use_hd)
+    train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = norm, forcecpu = True, shuffle = False, use_hd = use_hd)
+    val_loader = iterator(datasets["val"][0], datasets["val"][1], transforms = norm, forcecpu = True, shuffle = False, use_hd = use_hd)
+    test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = norm, forcecpu = True, shuffle = False, use_hd = use_hd)
     return (train_loader, train_clean, val_loader, test_loader), [3, 32, 32], (64, 16, 20, 600), True, False
-
-from PIL import Image
 
 def miniImageNet(use_hd = True):
     datasets = {}
@@ -318,7 +322,7 @@ def miniImageNet(use_hd = True):
     print()
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
-    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm)
+    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84, scale=(0.14,1)), norm)
     if args.episodic:
         train_loader = episodic_iterator(datasets["train"][0], 64, transforms = train_transforms, forcecpu = True, use_hd = True)
     else:
@@ -328,74 +332,148 @@ def miniImageNet(use_hd = True):
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
 
+
+def tieredImageNet(use_hd=True):
+    """
+    tiredImagenet dataset
+    Number of classes : 
+    - train: 351
+    - val  : 97
+    - novel: 160
+    Number of samples per class: at most 1300
+    Total number of images: 790400
+    Images size : 84x84
+    """
+    datasets = {}
+    total = 790400
+    num_elements = {}
+    buffer = {'train':0, 'val':351, 'test':351+97}
+    for subset in ['train', 'val', 'test']:
+        data = []
+        target = []
+        num_elements[subset]=[]
+        if subset=='train':
+            data_train = []
+            target_train = []
+        subset_path = os.path.join(args.dataset_path, 'tieredimagenet', subset)
+        classe_files = os.listdir(subset_path)
+        
+        for c, classe in enumerate(classe_files):
+            files = os.listdir(os.path.join(subset_path, classe))
+            count = 0
+            for file in files:
+                count += 1
+                target.append(c+buffer[subset])
+                if subset=='train':
+                    target_train.append(c)
+                path = os.path.join(subset_path, classe, file)
+                if not use_hd:
+                    image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
+                    data.append(image)
+                    if subset=='train':
+                        data_train.append(image)
+                else:
+                    data.append(path)
+                    if subset=='train':
+                        data_train.append(path)
+            num_elements[subset].append(count)
+            if count<1300:
+                for i in range(1300-count):
+                    target.append(c+buffer[subset]) 
+                    if not use_hd: # add the same element
+                        image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
+                        data.append(image)
+                    else:
+                        data.append(path) 
+                        
+        datasets[subset] = [data, torch.LongTensor(target)]
+
+    datasets['train_base']=[data_train, torch.LongTensor(target_train)] # clean train without duplicates
+            
+    assert (len(datasets['train'][0])+len(datasets['val'][0])+len(datasets['test'][0])==total), 'Total number of sample per class is not 1300'
+    print()
+    norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
+    train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
+    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84, scale=(0.14,1)), norm)
+    if args.episodic:
+        train_loader = episodic_iterator(datasets["train_base"][0], 351, transforms = train_transforms, forcecpu = True, use_hd = True)
+    else:
+        train_loader = iterator(datasets["train_base"][0], datasets["train_base"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
+    train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    val_loader = iterator(datasets["val"][0], datasets["val"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (351, 97, 160, (num_elements['train'], num_elements['val'], num_elements['test'])), True, False
+
 import pickle
 
-def CUBfs():
-    with open(args.dataset_path + "CUB/base.pkl", "rb") as f:
-        train_file = pickle.load(f)
-    train, train_targets = [(x.float() / 256) for x in train_file['data']], torch.LongTensor(train_file['labels'])
-    for i in range(len(train)):
-        if train[i].shape[0] != 3:
-            train[i] = train[i].repeat(3,1,1)
+def CUBfs(use_hd=False):
+    """
+    CUB FS dataset
+    Number of classes : 
+    - train: 100
+    - val  : 50
+    - novel: 50
+    Number of samples per class: at most 60
+    Images size : 84x84
+    """
+    classes      = []
+    datasets     = {}
+    num_elements = {}
+    path         = os.path.join(args.dataset_path, 'cub')
+    list_files = os.listdir(path)
+
+    for subset in ['train', 'val', 'test']:
+        data   = []
+        class_counter = {}
+        target = []
+        csv_path = os.path.join(path, 'split', f'{subset}.csv')
+        with open(csv_path, "r") as f:
+            start = 0
+            for line in f:
+                if start == 0:
+                    start += 1
+                else:
+                    splits = line.split(",")
+                    fn, c = splits[0], splits[1]
+                    if fn in list_files:
+                        c = int(c.split('.')[0])
+                        if c not in classes:
+                            classes.append(c)
+                            class_counter[len(classes)-1]=1
+                        else:
+                            class_counter[len(classes)-1]+=1
+                        target.append(len(classes)-1)
+                        file_path = os.path.join(args.dataset_path, 'cub', fn)
+                        if not use_hd:
+                            image = transforms.ToTensor()(np.array(Image.open(file_path).convert('RGB')))
+                            data.append(image)
+                        else:
+                            data.append(file_path)
+        if subset == 'train':
+            datasets['train_base'] = [data.copy(), torch.LongTensor(target)]
+        
+        for c, count in class_counter.items():
+            if count < 60:
+                for _ in range(60-count):
+                    if not use_hd:
+                        data.append(image)
+                    else:
+                        data.append(file_path)
+                    target.append(c)
+        datasets[subset] = [data, torch.LongTensor(target)]
+        num_elements[subset] = list(class_counter.values())
+    print()
+    norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
+    train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.RandomHorizontalFlip(), norm)
+    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84, scale=(0.14,1)), norm)
     if args.episodic:
-        new_train = []
-        num_elements_train = []
-        for i in range(100):
-            indices = torch.where(train_targets == i)[0]
-            num_elements_train.append(len(indices))
-            for x in indices:
-                new_train.append(train[x])
-            size = len(indices)
-            if size < 60:
-                for i in range(60 - size):
-                    new_train.append(train[indices[i]])
-        train, train_targets = [new_train, torch.arange(100).repeat_interleave(60)]
-    with open(args.dataset_path + "CUB/val.pkl", "rb") as f:
-        train_file = pickle.load(f)
-    validation, validation_targets = [(x.float() / 256) for x in train_file['data']], torch.LongTensor(train_file['labels'])
-    new_val = []
-    num_elements_val = []
-    for i in range(len(validation)):
-        if validation[i].shape[0] != 3:
-            validation[i] = validation[i].repeat(3, 1, 1)
-    for i in range(100,150):
-        indices = torch.where(validation_targets == i)[0]
-        num_elements_val.append(len(indices))
-        for x in indices:
-            new_val.append(validation[x])
-        size = len(indices)
-        if size < 60:
-            for i in range(60 - size):
-                new_val.append(validation[indices[i]])
-    validation, validation_targets = [new_val, torch.arange(100, 150).repeat_interleave(60)]
-    with open(args.dataset_path + "CUB/novel.pkl", "rb") as f:
-        train_file = pickle.load(f)
-    novel, novel_targets = [(x.float() / 256) for x in train_file['data']], torch.LongTensor(train_file['labels'])
-    for i in range(len(novel)):
-        if novel[i].shape[0] != 3:
-            novel[i] = novel[i].repeat(3, 1, 1)
-    new_novel = []
-    num_elements_novel = []
-    for i in range(150,200):
-        indices = torch.where(novel_targets == i)[0]
-        for x in indices:
-            new_novel.append(novel[x])
-        num_elements_novel.append(len(indices))
-        size = len(indices)
-        if size < 60:
-            for i in range(60 - size):
-                new_novel.append(novel[indices[i]])
-    novel, novel_targets = [new_novel, torch.arange(150, 200).repeat_interleave(60)]
-    train_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), transforms.RandomHorizontalFlip(), transforms.Normalize((0.4770, 0.4921, 0.4186) ,(0.1805, 0.1792, 0.1898)))
-    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), transforms.Normalize((0.4770, 0.4921, 0.4186), (0.1805, 0.1792, 0.1898)))
-    if args.episodic:
-        train_loader = episodic_iterator(train, 100, transforms = train_transforms, forcecpu = True, use_hd = True)
+        train_loader = episodic_iterator(datasets['train_base'][0], 100, transforms = train_transforms, forcecpu = True, use_hd = True)
     else:
-        train_loader = iterator(train, train_targets, transforms = train_transforms, forcecpu = True)
-    train_clean = iterator(train, train_targets, transforms = all_transforms, forcecpu = True, shuffle = False)
-    val_loader = iterator(validation, validation_targets, transforms = all_transforms, forcecpu = True, shuffle = False)
-    test_loader = iterator(novel, novel_targets, transforms = all_transforms, forcecpu = True, shuffle = False)
-    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (100, 50, 50, (num_elements_val, num_elements_novel)), True, False
+        train_loader = iterator(datasets['train_base'][0], datasets['train_base'][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
+    train_clean = iterator(datasets['train'][0], datasets['train'][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    val_loader = iterator(datasets['val'][0], datasets['val'][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    test_loader = iterator(datasets['test'][0], datasets['test'][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (100, 50, 50, (num_elements['train'], num_elements['val'], num_elements['test'])), True, False
 
 def omniglotfs():
     base = torch.load(args.dataset_path + "omniglot/base.pt")
@@ -408,7 +486,7 @@ def omniglotfs():
     novel_data = novel.reshape(-1, novel.shape[2], novel.shape[3], novel.shape[4]).float()
     novel_targets = torch.arange(novel.shape[0]).unsqueeze(1).repeat(1, novel.shape[1]).reshape(-1)
     train_transforms = torch.nn.Sequential(transforms.RandomCrop(100, padding = 4), transforms.Normalize((0.0782) ,(0.2685)))
-    all_transforms = torch.nn.Sequential(transforms.CenterCrop(100), transforms.Normalize((0.0782), (0.2685)))
+    all_transforms = torch.nn.Sequential(transforms.CenterCrop(100), transforms.Normalize((0.0782), (0.2685))) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomCrop(100, padding = 4), transforms.Normalize((0.0782) ,(0.2685)))
     if args.episodic:
         train_loader = episodic_iterator(base_data, base.shape[0], transforms = train_transforms)
     else:
@@ -430,7 +508,7 @@ def miniImageNet84():
     validation, validation_targets = [transforms.ToTensor()(x) for x in validation_file["data"]], validation_file["labels"]
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
-    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm)
+    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84), norm)
     if args.episodic:
         train_loader = episodic_iterator(train, 64, transforms = train_transforms, forcecpu = True)
     else:
@@ -459,6 +537,8 @@ def get_dataset(dataset_name):
         return CUBfs()
     elif dataset_name.lower() == "omniglotfs":
         return omniglotfs()
+    elif dataset_name.lower() == "tieredimagenet":
+        return tieredImageNet()
     else:
         print("Unknown dataset!")
 

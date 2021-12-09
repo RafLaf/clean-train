@@ -64,7 +64,7 @@ parser.add_argument("--skip-epochs", type=int, default="0", help="number of epoc
 parser.add_argument("--runs", type=int, default=1, help="number of runs")
 parser.add_argument("--quiet", action="store_true", help="prevent too much display of info")
 parser.add_argument("--dataset", type=str, default="CIFAR10", help="dataset to use")
-parser.add_argument("--dataset-size", type=int, default=-1, help="number of training samples (using a subset in that case) (only for classical classification)")
+parser.add_argument("--dataset-size", type=int, default=-1, help="number of training samples (using a subset for classical classification, and reducing size of epochs for few-shot)")
 parser.add_argument("--output", type=str, default="", help="output file to write")
 parser.add_argument("--save-features", type=str, default="", help="save features to file")
 parser.add_argument("--save-model", type=str, default="", help="save model to file")
@@ -73,12 +73,14 @@ parser.add_argument("--load-model", type=str, default="", help="load model from 
 parser.add_argument("--mean-model", nargs='+', default="", help="mean of two models model from list of file")
 parser.add_argument("--wandb", type=bool, default=False, help="Report to wandb")
 parser.add_argument("--seed", type=int, default=-1, help="set random seed manually, and also use deterministic approach")
+parser.add_argument("--wandb", type=bool, default=False, help="Report to wandb")
 
 ### few-shot parameters
 parser.add_argument("--n-shots", type=str, default="[1,5]", help="how many shots per few-shot run, can be int or list of ints. In case of episodic training, use first item of list as number of shots.")
 parser.add_argument("--n-runs", type=int, default=10000, help="number of few-shot runs")
 parser.add_argument("--n-ways", type=int, default=5, help="number of few-shot ways")
 parser.add_argument("--n-queries", type=int, default=15, help="number of few-shot queries")
+parser.add_argument("--sample-aug", type=int, default=1, help="number of versions of support/query samples (using random crop) 1 means no augmentation")
 parser.add_argument("--ncm-loss", action="store_true", help="use ncm output instead of linear")
 parser.add_argument("--episodic", action="store_true", help="use episodic training")
 parser.add_argument("--episodes-per-epoch", type=int, default=100, help="number of episodes per epoch")

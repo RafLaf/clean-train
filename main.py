@@ -43,6 +43,10 @@ print("models.")
 if args.ema > 0:
     from torch_ema import ExponentialMovingAverage
 
+if args.wandb:
+    import wandb
+
+
 
 
 ### global variables that are used by the train function
@@ -62,7 +66,7 @@ def crit(output, features, target):
         return criterion(output, target)
 
 ### main train function
-def train(model, train_loader, optimizer, epoch, mixup = False, mm = False):
+def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = False):
     model.train()
     global last_update
     losses, total = 0., 0
@@ -125,21 +129,30 @@ def train(model, train_loader, optimizer, epoch, mixup = False, mm = False):
             
         losses += loss.item() * data.shape[0]
         total += data.shape[0]
-
         # update parameters
         optimizer.step()
+        scheduler.step()
         if args.ema > 0:
             ema.update()
 
+        if few_shot and args.dataset_size > 0:
+            length = args.dataset_size // args.batch_size + (1 if args.dataset_size % args.batch_size != 0 else 0)
+        else:
+            length = len(train_loader)
         # print advances if at least 100ms have passed since last print
-        if (batch_idx + 1 == len(train_loader)) or (time.time() - last_update > 0.1) and not args.quiet:
-            if batch_idx + 1 < len(train_loader):
-                print("\r{:4d} {:4d} / {:4d} loss: {:.5f} time: {:s} ".format(epoch, 1 + batch_idx, len(train_loader), losses / total, format_time(time.time() - start_time)), end = "")
+        if (batch_idx + 1 == length) or (time.time() - last_update > 0.1) and not args.quiet:
+            if batch_idx + 1 < length:
+                print("\r{:4d} {:4d} / {:4d} loss: {:.5f} time: {:s} lr: {:.5f} ".format(epoch, 1 + batch_idx, length, losses / total, format_time(time.time() - start_time), float(scheduler.get_last_lr()[0])), end = "")
             else:
                 print("\r{:4d} loss: {:.5f} ".format(epoch, losses / total), end = '')
             last_update = time.time()
+
+        if few_shot and total >= args.dataset_size and args.dataset_size > 0:
+            break
+            
     if args.wandb:
         wandb.log({"epoch":epoch, "train_loss": losses / total})
+
     # return train_loss
     return { "train_loss" : losses / total}
 
@@ -173,6 +186,10 @@ def test(model, test_loader):
             ema.restore()
     # return results
     model.train()
+    
+    if args.wandb:
+        wandb.log({ "test_loss" : test_loss / total, "test_acc" : accuracy / total, "test_acc_top_5" : accuracy_top_5 / total})
+
     return { "test_loss" : test_loss / total, "test_acc" : accuracy / total, "test_acc_top_5" : accuracy_top_5 / total}
 
 # function to train a model using args.epochs epochs
@@ -192,19 +209,23 @@ def train_complete(model, loaders, mixup = False):
 
     for epoch in range(args.epochs + args.manifold_mixup):
 
+        if few_shot and args.dataset_size > 0:
+            length = args.dataset_size // args.batch_size + (1 if args.dataset_size % args.batch_size != 0 else 0)
+        else:
+            length = len(train_loader)
+
         if (args.cosine and epoch % args.milestones[0] == 0) or epoch == 0:
             if lr < 0:
                 optimizer = torch.optim.Adam(model.parameters(), lr = -1 * lr)
             else:
                 optimizer = torch.optim.SGD(model.parameters(), lr = lr, momentum = 0.9, weight_decay = 5e-4, nesterov = True)
             if args.cosine:
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = args.milestones[0])
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = args.milestones[0] * length)
                 lr = lr * args.gamma
             else:
-                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = args.milestones, gamma = args.gamma)
+                scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = list(np.array(args.milestones) * length), gamma = args.gamma)
 
-        train_stats = train(model, train_loader, optimizer, (epoch + 1), mixup = mixup, mm = epoch >= args.epochs)
-        scheduler.step()
+        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs)        
         
         if args.save_model != "" and not few_shot:
             if len(args.devices) == 1:
@@ -224,7 +245,6 @@ def train_complete(model, loaders, mixup = False):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
                     if args.wandb:
                         wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2]})
-                print()
             else:
                 test_stats = test(model, test_loader)
                 if top_5:
@@ -253,18 +273,21 @@ loaders, input_shape, num_classes, few_shot, top_5 = datasets.get_dataset(args.d
 ### initialize few-shot meta data
 if few_shot:
     num_classes, val_classes, novel_classes, elements_per_class = num_classes
-    if args.dataset.lower() == "cubfs":
-        elements_val, elements_novel = elements_per_class
+    if args.dataset.lower() in ["tieredimagenet", "cubfs"]:
+        elements_train, elements_val, elements_novel = elements_per_class
     else:
         elements_val, elements_novel = [elements_per_class] * val_classes, [elements_per_class] * novel_classes
+        elements_train = None
     print("Dataset contains",num_classes,"base classes,",val_classes,"val classes and",novel_classes,"novel classes.")
     print("Generating runs... ", end='')
+
     val_runs = list(zip(*[few_shot_eval.define_runs(args.n_ways, s, args.n_queries, val_classes, elements_val) for s in args.n_shots]))
     val_run_classes, val_run_indices = val_runs[0], val_runs[1]
     novel_runs = list(zip(*[few_shot_eval.define_runs(args.n_ways, s, args.n_queries, novel_classes, elements_novel) for s in args.n_shots]))
     novel_run_classes, novel_run_indices = novel_runs[0], novel_runs[1]
     print("done.")
     few_shot_meta_data = {
+        "elements_train":elements_train,
         "val_run_classes" : val_run_classes,
         "val_run_indices" : val_run_indices,
         "novel_run_classes" : novel_run_classes,
@@ -306,7 +329,7 @@ def create_model():
         return s2m2.S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
 if args.test_features != "":
-    test_features = torch.load(args.test_features).to(args.dataset_device)
+    test_features = torch.load(args.test_features, map_location=torch.device(args.device)).to(args.dataset_device)
     print("Testing features of shape", test_features.shape)
     train_features = test_features[:num_classes]
     val_features = test_features[num_classes:num_classes + val_classes]
