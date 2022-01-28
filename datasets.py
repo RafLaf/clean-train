@@ -333,11 +333,23 @@ def miniImageNet(use_hd = True):
     if args.episodic:
         train_loader = episodic_iterator(datasets["train"][0], 64, transforms = train_transforms, forcecpu = True, use_hd = True)
     else:
-        train_loader = iterator(datasets["train"][0], datasets["train"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
+        if args.meta:
+            data_cut = []
+            for i in range(0,len(datasets["train"][0]),600):
+                data_cut+=datasets["train"][0][i:i+500]
+            target_cut = torch.cat([datasets["train"][1][i:i+500] for i in range(0,len(datasets["train"][0]),600)]).ravel()
+            train_loader = iterator(data_cut, target_cut, transforms = train_transforms, forcecpu = True, use_hd = use_hd) 
+            print('len of train loader', len(data_cut))  
+        else:
+            train_loader = iterator(datasets["train"][0], datasets["train"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)   
+            print('len of train loader', len(datasets["train"][0]))  
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     val_loader = iterator(datasets["validation"][0], datasets["validation"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
-    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
+    if args.meta:
+        return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, (500,600,600,600)), True, False
+    else:
+        return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
 
 
 def tieredImageNet(use_hd=True):

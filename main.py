@@ -255,6 +255,9 @@ if few_shot:
     num_classes, val_classes, novel_classes, elements_per_class = num_classes
     if args.dataset.lower() in ["tieredimagenet", "cubfs"]:
         elements_train, elements_val, elements_novel = elements_per_class
+    if args.dataset.lower() == 'miniimagenet' and args.meta:
+        elements_train, elements_train_clean,elements_val, elements_novel = elements_per_class
+        elements_val, elements_novel = [elements_val]*val_classes ,[elements_novel]*novel_classes
     else:
         elements_val, elements_novel = [elements_per_class] * val_classes, [elements_per_class] * novel_classes
         elements_train = None
