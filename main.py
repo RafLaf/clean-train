@@ -244,7 +244,13 @@ def train_complete(model, loaders, mixup = False):
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
                     if args.wandb:
+<<<<<<< HEAD
                         wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2]})
+=======
+                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i]})
+
+                print()
+>>>>>>> vincent_copy
             else:
                 test_stats = test(model, test_loader)
                 if top_5:
@@ -329,7 +335,13 @@ def create_model():
         return s2m2.S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
 if args.test_features != "":
-    test_features = torch.load(args.test_features, map_location=torch.device(args.device)).to(args.dataset_device)
+    try:
+        filenames = eval(args.test_features)
+    except:
+        filenames = args.test_features
+    if isinstance(filenames, str):
+        filenames = [filenames]
+    test_features = torch.cat([torch.load(fn, map_location=torch.device(args.device)).to(args.dataset_device) for fn in filenames], dim = 2)
     print("Testing features of shape", test_features.shape)
     train_features = test_features[:num_classes]
     val_features = test_features[num_classes:num_classes + val_classes]
@@ -348,7 +360,17 @@ for i in range(args.runs):
 
     if not args.quiet:
         print(args)
+<<<<<<< HEAD
         
+=======
+    if args.wandb:
+        wandb.init(project="few-shot", 
+            entity=args.wandb, 
+            tags=[f'run_{i}', args.dataset], 
+            notes=str(vars(args))
+            )
+        wandb.log({"run": i})
+>>>>>>> vincent_copy
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
