@@ -393,7 +393,7 @@ for i in range(args.runs):
     if not args.quiet:
         print(args)
     if args.wandb:
-        tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['base' + args.base , 'val' + args.val,'novel' + args.novel]
+        tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['base' + args.base , 'val' + args.val,'novel' + args.novel] + [str(args.rmclass)]
         wandb.init(project="few-shot", 
             entity=args.wandb, 
             tags=[f'run_{i}']+ tag, 
@@ -401,6 +401,7 @@ for i in range(args.runs):
             )
         wandb.log({"run": i})
         wandb.log({'base': args.base, 'val': args.val , 'novel': args.novel })
+        wandb.log({'rmclass': args.rmclass })
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)

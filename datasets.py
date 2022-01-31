@@ -304,6 +304,8 @@ def miniImageNet(use_hd = True):
     classes = []
     total = 60000
     count = 0
+    count_class = -1   #init such that the fist class is 0 
+    oldc = 0
     for subset in ["train", "validation", "test"]:
         data = []
         target = []
@@ -315,16 +317,20 @@ def miniImageNet(use_hd = True):
                 else:
                     splits = line.split(",")
                     fn, c = splits[0], splits[1]
-                    if c not in classes:
-                        classes.append(c)
-                    count += 1
-                    target.append(len(classes) - 1)
-                    path = args.dataset_path + "miniimagenetimages/" + "images/" + fn
-                    if not use_hd:
-                        image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
-                        data.append(image)
-                    else:
-                        data.append(path)
+                    if c not in classes and oldc!=c:
+                        count_class+=1
+                        oldc = c 
+                        if count_class not in args.rmclass:
+                            classes.append(c)
+                    if count_class not in args.rmclass:
+                        count += 1
+                        target.append(len(classes) - 1)
+                        path = args.dataset_path + "miniimagenetimages/" + "images/" + fn
+                        if not use_hd:
+                            image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
+                            data.append(image)
+                        else:
+                            data.append(path)
         datasets[subset] = [data, torch.LongTensor(target)]
     print()
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
@@ -337,7 +343,7 @@ def miniImageNet(use_hd = True):
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     val_loader = iterator(datasets["validation"][0], datasets["validation"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
-    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
+    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64-len(args.rmclass), 16, 20, 600), True, False
 
 
 def tieredImageNet(use_hd=True):
