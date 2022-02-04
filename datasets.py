@@ -300,10 +300,10 @@ def cifarfs(use_hd=True, data_augmentation=True):
     return (train_loader, train_clean, val_loader, test_loader), [3,image_size, image_size], (64, 16, 20, 600), True, False
 
 def miniImageNet(use_hd = True):
+    global data,target
     datasets = {}
     classes = []
     total = 60000
-    count = 0
     count_class = -1   #init such that the fist class is 0 
     oldc = 0
     for subset in ["train", "validation", "test"]:
@@ -319,19 +319,37 @@ def miniImageNet(use_hd = True):
                     fn, c = splits[0], splits[1]
                     if c not in classes and oldc!=c:
                         count_class+=1
+                        countmerge =0
                         oldc = c 
-                        if count_class not in args.rmclass:
+                        if (count_class not in args.rmclass) and (count_class not in args.mergeclass[1:]) :
                             classes.append(c)
-                    if count_class not in args.rmclass:
-                        count += 1
-                        target.append(len(classes) - 1)
+                        if len(args.mergeclass)!=0:
+                            if count_class == args.mergeclass[0]:
+                                index = len(target)
+                    if (count_class not in args.rmclass):
                         path = args.dataset_path + "miniimagenetimages/" + "images/" + fn
-                        if not use_hd:
-                            image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
-                            data.append(image)
+                        if count_class in args.mergeclass and subset=='train':
+                            countmerge+=1
+                            if countmerge <= int(600/len(args.mergeclass)):
+                                target.insert(index,args.mergeclass[0])
+                                if not use_hd:
+                                    image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
+                                    data.insert(index,image)
+                                else:
+                                    data.insert(index,path)
+                            else:
+                                pass
                         else:
-                            data.append(path)
+                            target.append(len(classes) - 1)
+                            
+                            if not use_hd:
+                                image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
+                                data.append(image)
+                            else:
+                                data.append(path)
+        
         datasets[subset] = [data, torch.LongTensor(target)]
+        print(subset, len(target))
     print()
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
@@ -343,7 +361,10 @@ def miniImageNet(use_hd = True):
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     val_loader = iterator(datasets["validation"][0], datasets["validation"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
-    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64-len(args.rmclass), 16, 20, 600), True, False
+    compensate = 0
+    if len(args.mergeclass)!=0:
+        compensate = -len(args.mergeclass)+1
+    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64-len(args.rmclass)+compensate, 16, 20, 600), True, False
 
 
 def tieredImageNet(use_hd=True):

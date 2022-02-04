@@ -78,7 +78,8 @@ parser.add_argument("--test-features", type=str, default="", help="test features
 parser.add_argument("--load-model", type=str, default="", help="load model from file")
 parser.add_argument("--seed", type=int, default=-1, help="set random seed manually, and also use deterministic approach")
 parser.add_argument("--wandb", type=str, default='', help="Report to wandb, input is the entity name")
-parser.add_argument('--rmclass', nargs='+', type=int)
+parser.add_argument('--rmclass', nargs='+', type=int, default=[])
+parser.add_argument('--mergeclass', nargs='+', type=int, default=[])
 
 ### few-shot parameters
 parser.add_argument("--n-shots", type=str, default="[1,5]", help="how many shots per few-shot run, can be int or list of ints. In case of episodic training, use first item of list as number of shots.")
