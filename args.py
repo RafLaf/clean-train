@@ -80,6 +80,7 @@ parser.add_argument("--seed", type=int, default=-1, help="set random seed manual
 parser.add_argument("--wandb", type=str, default='', help="Report to wandb, input is the entity name")
 parser.add_argument('--rmclass', nargs='+', type=int, default=[])
 parser.add_argument('--mergeclass', nargs='+', type=int, default=[])
+parser.add_argument('--moveclass', nargs='+', type=int, default=[])
 
 ### few-shot parameters
 parser.add_argument("--n-shots", type=str, default="[1,5]", help="how many shots per few-shot run, can be int or list of ints. In case of episodic training, use first item of list as number of shots.")

@@ -350,6 +350,35 @@ def miniImageNet(use_hd = True):
         
         datasets[subset] = [data, torch.LongTensor(target)]
         print(subset, len(target))
+    if args.moveclass!=[]:
+        for i in args.moveclass:
+            if i<64:
+                pass
+            elif i>80:
+                subset = 'test'
+            else:
+                subset = 'validation'
+            data , target = datasets[subset]
+            idx = target == i
+            idxn = idx.numpy()
+            target_class = target[idx]
+            data_class = np.array(data)[idxn]
+            data = np.delete(np.array(data),idxn)
+            target = target[target!=i]
+            target[target<i]+=1
+            if subset == 'test':
+                datasets['validation'][1]+=1
+            data = list(data)
+            datasets[subset] = [data, target.type(torch.LongTensor)]
+            data , target = datasets['train']
+            data += list(data_class)
+            n_bc = target[-1]
+            added_target = torch.ones(len(list(data_class)))*(n_bc+1)
+            target = torch.cat((target, added_target),0)
+            datasets['train'] = [data, target.type(torch.LongTensor)]
+    
+    for subset in ['train', 'validation' ,'test']:
+        print(subset, len(datasets[subset][0]))
     print()
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
@@ -364,7 +393,14 @@ def miniImageNet(use_hd = True):
     compensate = 0
     if len(args.mergeclass)!=0:
         compensate = -len(args.mergeclass)+1
-    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64-len(args.rmclass)+compensate, 16, 20, 600), True, False
+    compval,comptest=0,0
+    compensate+=len(args.moveclass)
+    for i in args.moveclass:
+        if i>80:
+            comptest +=1
+        if i <80 and i>=64:
+            compval +=1 
+    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64-len(args.rmclass)+compensate, 16-compval, 20-comptest, 600), True, False
 
 
 def tieredImageNet(use_hd=True):
