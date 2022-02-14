@@ -332,6 +332,7 @@ def miniImageNet(use_hd = True):
                         else:
                             data.append(path)
         datasets[subset] = [data, torch.LongTensor(target)]
+    print('remove class' , args.rmclass)
     print()
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)

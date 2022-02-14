@@ -394,7 +394,7 @@ for i in range(args.runs):
         print(args)
     if args.wandb:
         tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
-        wandb.init(project="few-shot", 
+        wandb.init(project="rmclass", 
             entity=args.wandb, 
             tags=tag, 
             notes=str(vars(args))
