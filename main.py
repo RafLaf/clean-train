@@ -423,9 +423,7 @@ for i in range(args.runs):
 
     if not args.quiet:
         print(args)
-<<<<<<< HEAD
-        
-=======
+
     if args.wandb:
         tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
         wandb.init(project="few-shot", 
@@ -434,12 +432,8 @@ for i in range(args.runs):
             notes=str(vars(args))
             )
         wandb.log({"run": i})
-<<<<<<< HEAD
->>>>>>> vincent_copy
-=======
         wandb.log({'base': args.base, 'val': args.val , 'novel': args.novel, 'run' : i })
         wandb.log({'rmclass': args.rmclass })
->>>>>>> vincent_cop
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
