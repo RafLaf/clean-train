@@ -17,6 +17,15 @@ def define_runs(n_ways, n_shots, n_queries, num_classes, elements_per_class):
             run_indices[i,j] = torch.randperm(elements_per_class[run_classes[i, j]])[:n_shots + n_queries]
     return run_classes, run_indices
 
+def enforce_runs(run_classes, forced_class):
+    run_class_f = run_classes.clone()
+    idx = torch.where(run_class_f ==forced_class)
+    run_class_f[idx] = torch.randint(0,int(run_class_f.max()),(run_class_f[idx].shape[0],)).to(device=args.device)
+    run_class_f[:,0] = forced_class
+    return run_class_f
+
+
+
 def generate_runs(data, run_classes, run_indices, batch_idx):
     n_runs, n_ways, n_samples = run_classes.shape[0], run_classes.shape[1], run_indices.shape[2]
     run_classes = run_classes[batch_idx * batch_few_shot_runs : (batch_idx + 1) * batch_few_shot_runs]
@@ -152,11 +161,16 @@ def get_features(model, loader, n_aug = args.sample_aug):
             features_total += torch.cat(all_features, dim = 0).reshape(num_classes, -1, all_features[0].shape[1])
     return features_total / n_aug
 
-def eval_few_shot(train_features, val_features, novel_features, val_run_classes, val_run_indices, novel_run_classes, novel_run_indices, n_shots, transductive = False,elements_train=None):
+def eval_few_shot(train_features, val_features, novel_features, val_run_classes, val_run_indices, novel_run_classes, novel_run_indices, n_shots, transductive = False,elements_train=None,force_class=None):
+    print("FORCED", force_class)
     if transductive:
         return softkmeans(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), softkmeans(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)
     else:
-        return ncm(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), ncm(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)
+        if args.forced_class:
+            novel_run_classes_f = enforce_runs(novel_run_classes, force_class)
+        else:
+            novel_run_classes_f = novel_run_classes
+        return ncm(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), ncm(train_features, novel_features, novel_run_classes_f, novel_run_indices, n_shots, elements_train=elements_train)
 
 def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data):
 
@@ -173,8 +187,8 @@ def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_
 
     return res
 
-def evaluate_shot(index, train_features, val_features, novel_features, few_shot_meta_data, model = None, transductive = False):
-    (val_acc, val_conf), (novel_acc, novel_conf) = eval_few_shot(train_features, val_features, novel_features, few_shot_meta_data["val_run_classes"][index], few_shot_meta_data["val_run_indices"][index], few_shot_meta_data["novel_run_classes"][index], few_shot_meta_data["novel_run_indices"][index], args.n_shots[index], transductive = transductive, elements_train=few_shot_meta_data["elements_train"])
+def evaluate_shot(index, train_features, val_features, novel_features, few_shot_meta_data, model = None, transductive = False , force_class =None):
+    (val_acc, val_conf), (novel_acc, novel_conf) = eval_few_shot(train_features, val_features, novel_features, few_shot_meta_data["val_run_classes"][index], few_shot_meta_data["val_run_indices"][index], few_shot_meta_data["novel_run_classes"][index], few_shot_meta_data["novel_run_indices"][index], args.n_shots[index], transductive = transductive, elements_train=few_shot_meta_data["elements_train"],force_class=force_class)
     if val_acc > few_shot_meta_data["best_val_acc"][index]:
         if val_acc > few_shot_meta_data["best_val_acc_ever"][index]:
             few_shot_meta_data["best_val_acc_ever"][index] = val_acc
