@@ -103,7 +103,7 @@ def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = 
             data[3*bs:] = data[3*bs:].transpose(3,2).flip(2)
             target_rot[3*bs:] = 3
 
-        if mixup and args.mm: # mixup or manifold_mixup
+        if mixup or args.mm: # mixup or manifold_mixup
             index_mixup = torch.randperm(data.shape[0])
             lam = random.random()            
             if args.mm:
@@ -218,7 +218,16 @@ def train_complete(model, loaders, mixup = False):
             if lr < 0:
                 optimizer = torch.optim.Adam(model.parameters(), lr = -1 * lr)
             else:
-                optimizer = torch.optim.SGD(model.parameters(), lr = lr, momentum = 0.9, weight_decay = 5e-4, nesterov = True)
+                all_params = set(model.parameters())
+                wd_params = set()
+                for m in model.modules():
+                    try:
+                        _ = m.weight.shape
+                        wd_params.add(m.weight)
+                    except:
+                        pass
+                no_wd = all_params - wd_params
+                optimizer = torch.optim.SGD([{'params':list(wd_params)}, {'params':list(no_wd), 'weight_decay':0}], lr = lr, momentum = 0.9, weight_decay = 5e-4, nesterov = True)
             if args.cosine:
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = args.milestones[0] * length)
                 lr = lr * args.gamma
@@ -244,13 +253,9 @@ def train_complete(model, loaders, mixup = False):
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
                     if args.wandb:
-<<<<<<< HEAD
-                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2]})
-=======
                         wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i]})
 
                 print()
->>>>>>> vincent_copy
             else:
                 test_stats = test(model, test_loader)
                 if top_5:
@@ -275,15 +280,63 @@ def train_complete(model, loaders, mixup = False):
         return test_stats
 
 ### process main arguments
-loaders, input_shape, num_classes, few_shot, top_5 = datasets.get_dataset(args.dataset)
+if (args.dataset == '' and '' in [args.base , args.val, args.novel]) or (args.dataset != '' and ('' != args.base or '' != args.val or '' != args.novel)) :
+    raise("Do you want to do cross-domain ? if NO use --dataset ;  if YES --base --val --novel ; you cannot use both ; define which dataset you want after each argument")
+
+if args.dataset != "" :
+    loaders, input_shape, num_classes, few_shot, top_5 = datasets.get_dataset(args.dataset)
+
+if args.base != "" and args.val != "" and args.novel != "":
+    loadersb, input_shapeb, num_classesb, few_shotb, top_5b = datasets.get_dataset(args.base)
+    if args.base == args.val:
+        loadersv, input_shapev, num_classesv, few_shotv, top_5v  = loadersb, input_shapeb, num_classesb, few_shotb, top_5b
+    else:
+        loadersv, input_shapev, num_classesv, few_shotv, top_5v = datasets.get_dataset(args.val)
+    if args.base == args.novel:
+        loadersn, input_shapen, num_classesn, few_shotn, top_5n = loadersb, input_shapeb, num_classesb, few_shotb, top_5b
+    elif args.base != args.novel and args.val == args.novel :
+        loadersn, input_shapen, num_classesn, few_shotn, top_5n = loadersv, input_shapev, num_classesv, few_shotv, top_5v
+    else:
+        loadersn, input_shapen, num_classesn, few_shotn, top_5n = datasets.get_dataset(args.novel)
+    loaders = (loadersb[0],loadersb[1], loadersv[2],loadersn[3])
+    loadersb,loadersv,loadersn=0,0,0
+
+    if  few_shotb != few_shotv or few_shotb != few_shotn or top_5b!=top_5v or top_5b!=top_5n :
+        print(few_shotb != few_shotv , few_shotb != few_shotn , top_5b!=top_5v,top_5b!=top_5n )
+        print('few_shotb != few_shotv or few_shotb != few_shotn or top_5b!=top_5v or top_5b!=top_5n')
+        raise InputError('the cross domain needs the same input dimension of images')
+    else:
+        input_shape = input_shapeb
+        few_shot =few_shotb
+        top_5 = top_5b
+
+
 ### initialize few-shot meta data
 if few_shot:
-    num_classes, val_classes, novel_classes, elements_per_class = num_classes
+    if args.dataset != "":
+        num_classes, val_classes, novel_classes, elements_per_class = num_classes
     if args.dataset.lower() in ["tieredimagenet", "cubfs"]:
         elements_train, elements_val, elements_novel = elements_per_class
-    else:
+    elif args.dataset != "":
         elements_val, elements_novel = [elements_per_class] * val_classes, [elements_per_class] * novel_classes
         elements_train = None
+    elif args.base != "":
+        num_classes , val_classes , novel_classes = num_classesb[0] , num_classesv[1] ,num_classesn[2]
+        if args.base.lower() in ["tieredimagenet", "cubfs"]:
+            elements_train= num_classesb[3][0]
+        else:
+            elements_train = num_classesb[3]
+        if args.val.lower() in ["tieredimagenet", "cubfs"]:
+            elements_val = num_classesv[3][1]
+        else:
+            elements_val  =  [num_classesv[3]] *val_classes
+        if args.novel.lower() in ["tieredimagenet", "cubfs"]:
+            elements_novel = num_classesn[3][2]
+        else:
+            elements_novel = [num_classesn[3]]*novel_classes
+
+    
+
     print("Dataset contains",num_classes,"base classes,",val_classes,"val classes and",novel_classes,"novel classes.")
     print("Generating runs... ", end='')
 
@@ -341,15 +394,25 @@ if args.test_features != "":
         filenames = args.test_features
     if isinstance(filenames, str):
         filenames = [filenames]
-    test_features = torch.cat([torch.load(fn, map_location=torch.device(args.device)).to(args.dataset_device) for fn in filenames], dim = 2)
-    print("Testing features of shape", test_features.shape)
-    train_features = test_features[:num_classes]
-    val_features = test_features[num_classes:num_classes + val_classes]
-    test_features = test_features[num_classes + val_classes:]
+    if args.dataset != '':
+        test_features = torch.cat([torch.load(fn, map_location=torch.device(args.device)).to(args.dataset_device) for fn in filenames], dim = 2)
+        print("Testing features of shape", test_features.shape)
+        train_features = test_features[:num_classes]
+        val_features = test_features[num_classes:num_classes + val_classes]
+        test_features = test_features[num_classes + val_classes:]
+    else:
+        test_features = torch.load(filenames[0], map_location=torch.device(args.device))
+        
+        train_features = test_features['base'].to(args.dataset_device)
+        val_features = test_features['val'].to(args.dataset_device)
+        test_features = test_features['novel'].to(args.dataset_device)
+        print("Testing features of shape", 'base', train_features.shape, 'val', val_features.shape, 'novel', test_features.shape)
+        print("if it fails please make sure --base --val --novel do correspond to the shapes above or (memory error) lower --batch-fs")
     if not args.transductive:
         for i in range(len(args.n_shots)):
             val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data)
-            print("Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+            print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+            print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
     else:
         for i in range(len(args.n_shots)):
             val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, transductive = True)
@@ -364,13 +427,19 @@ for i in range(args.runs):
         
 =======
     if args.wandb:
+        tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
         wandb.init(project="few-shot", 
             entity=args.wandb, 
-            tags=[f'run_{i}', args.dataset], 
+            tags=tag, 
             notes=str(vars(args))
             )
         wandb.log({"run": i})
+<<<<<<< HEAD
 >>>>>>> vincent_copy
+=======
+        wandb.log({'base': args.base, 'val': args.val , 'novel': args.novel, 'run' : i })
+        wandb.log({'rmclass': args.rmclass })
+>>>>>>> vincent_cop
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
