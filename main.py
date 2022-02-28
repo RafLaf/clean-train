@@ -423,9 +423,7 @@ for i in range(args.runs):
 
     if not args.quiet:
         print(args)
-<<<<<<< HEAD
-        
-=======
+
     if args.wandb:
         tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
         wandb.init(project="few-shot", 
