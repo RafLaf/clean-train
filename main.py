@@ -387,17 +387,12 @@ def create_model():
     if args.model.lower() == "s2m2r":
         return s2m2.S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
-if args.test_features != "":
-    try:
-        filenames = eval(args.test_features)
-    except:
-        filenames = args.test_features
-    if isinstance(filenames, str):
-        filenames = [filenames]
+
+def make_a_run():
     if args.dataset != '':
-        num_classes -= args.nb_of_rm
         print(num_classes +args.nb_of_rm , '->', num_classes) 
         test_features = torch.cat([torch.load(fn, map_location=torch.device(args.device)).to(args.dataset_device) for fn in filenames], dim = 2)
+        print(test_features[0,0,0])
         print("Testing features of shape", test_features.shape)
         train_features = test_features[:num_classes]
         val_features = test_features[num_classes:num_classes + val_classes]
@@ -424,12 +419,35 @@ if args.test_features != "":
                     print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
                     print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
                     if args.wandb!='':
-                        wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf, 'forced_class': force_class  })
-    else:
+                        if args.nb_of_rm!=0:
+                            wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'i_file' :i_file ,'forced_class': force_class  })
+                        else:
+                            wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'forced_class': force_class  })
+
+    else:               
         for i in range(len(args.n_shots)):
             val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, transductive = True)
             print("Transductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+
+if args.test_features != "":
+    try:
+        filenames = eval(args.test_features)
+    except:
+        filenames = args.test_features
+    if isinstance(filenames, str):
+        filenames = [filenames]
+    if args.dataset != '':
+        num_classes -= args.nb_of_rm
+    if args.nb_of_rm ==0:
+        make_a_run()
+    else:
+        for i_file in range(num_classes+1):
+            filenames = ['/users/local/vincent/f'+str(i_file)+'1']
+            make_a_run()
     sys.exit()
+
+
+
 
 for i in range(args.runs):
 
