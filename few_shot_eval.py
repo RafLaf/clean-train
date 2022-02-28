@@ -18,6 +18,7 @@ def define_runs(n_ways, n_shots, n_queries, num_classes, elements_per_class):
     return run_classes, run_indices
 
 def enforce_runs(run_classes, forced_class):
+    print(run_classes.shape)
     run_class_f = run_classes.clone()
     idx = torch.where(run_class_f ==forced_class)
     run_class_f[idx] = torch.randint(0,int(run_class_f.max()),(run_class_f[idx].shape[0],)).to(device=args.device)
