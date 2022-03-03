@@ -80,7 +80,8 @@ parser.add_argument("--mean-model", nargs='+', default="", help="mean of two mod
 parser.add_argument("--seed", type=int, default=-1, help="set random seed manually, and also use deterministic approach")
 parser.add_argument("--wandb", type=str, default='', help="Report to wandb, input is the entity name")
 parser.add_argument("--nb-of-rm", type=int, default=0, help="number of removed classes")
-parser.add_argument("--forced-class", action="store_true", help="use of mixup since beginning")
+parser.add_argument("--forced-class", action="store_true", help="force novel classes in FS runs")
+parser.add_argument("--force-couples", action="store_true", help="force of novel classes in FS runs")
 
 ### few-shot parameters
 parser.add_argument("--n-shots", type=str, default="[1,5]", help="how many shots per few-shot run, can be int or list of ints. In case of episodic training, use first item of list as number of shots.")

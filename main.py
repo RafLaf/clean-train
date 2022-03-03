@@ -407,13 +407,13 @@ def make_a_run():
         print("if it fails please make sure --base --val --novel do correspond to the shapes above or (memory error) lower --batch-fs")
     if not args.transductive:
         for i in range(len(args.n_shots)):
-            if not args.forced_class:
+            if not args.forced_class and not args.force_couples:
                 val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data)
                 print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
                 print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
                 if args.wandb!='':
                     wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf  })
-            else:
+            elif args.forced_class:
                 for force_class in range(test_features.shape[0]):
                     val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
                     print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
@@ -423,7 +423,18 @@ def make_a_run():
                             wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'i_file' :i_file ,'forced_class': force_class  })
                         else:
                             wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'forced_class': force_class  })
-
+            elif args.force_couples: 
+                for ind1 in range(test_features.shape[0]):
+                    for ind2 in range(test_features.shape[0]):
+                        force_class = [ind1,ind2]
+                        val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
+                        print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+                        print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
+                        if args.wandb!='':
+                            if args.nb_of_rm!=0:
+                                wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf' :val_conf,'i_file' :i_file ,'ind1': ind1 , 'ind2': ind2   })
+                            else:
+                                wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf': val_conf,'ind1': ind1 , 'ind2': ind2  })
     else:               
         for i in range(len(args.n_shots)):
             val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, transductive = True)

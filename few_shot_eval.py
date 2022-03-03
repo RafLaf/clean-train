@@ -19,10 +19,16 @@ def define_runs(n_ways, n_shots, n_queries, num_classes, elements_per_class):
 
 def enforce_runs(run_classes, forced_class):
     run_class_f = run_classes.clone()
-    idx = torch.where(run_class_f ==forced_class)
-    run_class_f[idx] = torch.randint(0,int(run_class_f.max()),(run_class_f[idx].shape[0],)).to(device=args.device)
-    run_class_f[:,0] = forced_class
-    return run_class_f
+    if isinstance(forced_class, int):
+        idx = torch.where(run_class_f ==forced_class)
+        run_class_f[idx] = torch.randint(0,int(run_class_f.max()),(run_class_f[idx].shape[0],)).to(device=args.device)
+        run_class_f[:,0] = forced_class
+        return run_class_f
+    elif isinstance(forced_class, list):
+        assert(args.n_ways ==2)
+        run_class_f[:,0] = forced_class[0]
+        run_class_f[:,1] = forced_class[1]
+        return run_class_f
 
 
 
@@ -166,7 +172,7 @@ def eval_few_shot(train_features, val_features, novel_features, val_run_classes,
     if transductive:
         return softkmeans(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), softkmeans(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)
     else:
-        if args.forced_class:
+        if args.forced_class or args.force_couples:
             novel_run_classes_f = enforce_runs(novel_run_classes, force_class)
         else:
             novel_run_classes_f = novel_run_classes
