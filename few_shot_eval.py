@@ -28,6 +28,7 @@ def enforce_runs(run_classes, forced_class):
         assert(args.n_ways ==2)
         run_class_f[:,0] = forced_class[0]
         run_class_f[:,1] = forced_class[1]
+        #print(run_class_f[:5])
         return run_class_f
 
 
@@ -44,6 +45,7 @@ def generate_runs(data, run_classes, run_indices, batch_idx):
     return res
 
 def ncm(train_features, features, run_classes, run_indices, n_shots, elements_train=None):
+    print(run_classes[:3])
     with torch.no_grad():
         dim = features.shape[2]
         targets = torch.arange(args.n_ways).unsqueeze(1).unsqueeze(0).to(args.device)
@@ -173,6 +175,7 @@ def eval_few_shot(train_features, val_features, novel_features, val_run_classes,
         return softkmeans(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), softkmeans(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)
     else:
         if args.forced_class or args.force_couples:
+            print("hello")
             novel_run_classes_f = enforce_runs(novel_run_classes, force_class)
         else:
             novel_run_classes_f = novel_run_classes

@@ -424,8 +424,9 @@ def make_a_run():
                         else:
                             wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'forced_class': force_class  })
             elif args.force_couples: 
-                for ind1 in range(test_features.shape[0]):
-                    for ind2 in range(test_features.shape[0]):
+                nb_novel = 20
+                for ind1 in range(nb_novel):
+                    for ind2 in range(nb_novel):
                         force_class = [ind1,ind2]
                         val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
                         print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
