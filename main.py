@@ -388,18 +388,17 @@ def create_model():
         return s2m2.S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
 
-def make_a_run():
+def make_a_run(num_classes):
     if args.dataset != '':
-        print(num_classes +args.nb_of_rm , '->', num_classes) 
+        #print(num_classes +args.nb_of_rm , '->', num_classes) 
         test_features = torch.cat([torch.load(fn, map_location=torch.device(args.device)).to(args.dataset_device) for fn in filenames], dim = 2)
         print(test_features[0,0,0])
         print("Testing features of shape", test_features.shape)
         train_features = test_features[:num_classes]
         val_features = test_features[num_classes:num_classes + val_classes]
-        test_features = test_features[num_classes + val_classes:]
+        test_features = test_features[-20:]
     else:
         test_features = torch.load(filenames[0], map_location=torch.device(args.device))
-        
         train_features = test_features['base'].to(args.dataset_device)
         val_features = test_features['val'].to(args.dataset_device)
         test_features = test_features['novel'].to(args.dataset_device)
@@ -412,7 +411,10 @@ def make_a_run():
                 print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
                 print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
                 if args.wandb!='':
-                    wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf  })
+                    if args.nb_of_rm!=0:
+                        wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'i_file' :i_file   })
+                    else:
+                        wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf })
             elif args.forced_class:
                 for force_class in range(test_features.shape[0]):
                     val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
@@ -425,6 +427,8 @@ def make_a_run():
                             wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'forced_class': force_class  })
             elif args.force_couples: 
                 nb_novel = 20
+                print(num_classes)
+                num_classes = 63
                 for ind1 in range(nb_novel):
                     for ind2 in range(nb_novel):
                         force_class = [ind1,ind2]
@@ -451,11 +455,11 @@ if args.test_features != "":
     if args.dataset != '':
         num_classes -= args.nb_of_rm
     if args.nb_of_rm ==0:
-        make_a_run()
+        make_a_run(num_classes)
     else:
-        for i_file in range(num_classes+1):
+        for i_file in range(0,num_classes+1):
             filenames = ['/users/local/vincent/f'+str(i_file)+'1']
-            make_a_run()
+            make_a_run(num_classes)
     sys.exit()
 
 

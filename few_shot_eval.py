@@ -50,6 +50,7 @@ def ncm(train_features, features, run_classes, run_indices, n_shots, elements_tr
         dim = features.shape[2]
         targets = torch.arange(args.n_ways).unsqueeze(1).unsqueeze(0).to(args.device)
         features = preprocess(train_features, features, elements_train=elements_train)
+        print(features.shape)
         scores = []
         for batch_idx in range(n_runs // batch_few_shot_runs):
             runs = generate_runs(features, run_classes, run_indices, batch_idx)
