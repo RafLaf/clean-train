@@ -152,6 +152,20 @@ def get_features(model, loader, n_aug = args.sample_aug):
             features_total += torch.cat(all_features, dim = 0).reshape(num_classes, -1, all_features[0].shape[1])
     return features_total / n_aug
 
+def get_novel(model, loader,class_number):
+    model.eval()
+    for batch_idx, (data, target) in enumerate(loader): 
+        with torch.no_grad():
+            data, target = data.to(args.device), target.to(args.device)
+            idx = class_number+80 == target
+            if idx.sum().item()!=0:
+                _, features = model(data)
+                if 'features_total' in locals():
+                    features_total = torch.cat((features_total, features[idx]), dim = 0) 
+                else:
+                    features_total = features[idx]
+    return features_total
+
 def eval_few_shot(train_features, val_features, novel_features, val_run_classes, val_run_indices, novel_run_classes, novel_run_indices, n_shots, transductive = False,elements_train=None):
     if transductive:
         return softkmeans(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), softkmeans(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)

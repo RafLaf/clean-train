@@ -116,3 +116,15 @@ class LabelSmoothingLoss(nn.Module):
         return torch.mean(torch.sum(-true_dist * pred, dim=-1))
 
 print("utils, ", end='')
+
+def SNR_complet(distrib_1 , distrib_2,complete=False, soft_allocation=None):
+    if soft_allocation==None:
+        m1, m2 = torch.mean(distrib_1,dim=0),torch.mean(distrib_2,dim=0)
+        std1, std2 = torch.norm(torch.std(distrib_1,dim=0)),torch.norm(torch.std(distrib_2,dim=0))
+        marge = torch.norm(m1-m2)
+        sig = (std1+std2)
+        #print(marge/sig)
+        if complete:
+            return marge, sig, (2*marge/sig).item()
+        else:
+            return (2*marge/sig).item()

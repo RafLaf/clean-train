@@ -128,10 +128,19 @@ class EpisodicDataset():
     def __len__(self):
         return self.n_batches
 
-def iterator(data, target, transforms, forcecpu = False, shuffle = True, use_hd = False):
+def iterator(data, target, transforms, forcecpu = False, shuffle = True, use_hd = False, use_sampler = False):
     if args.dataset_device == "cpu" or forcecpu:
+
         dataset = CPUDataset(data, target, transforms, use_hd = use_hd)
-        return torch.utils.data.DataLoader(dataset, batch_size = args.batch_size, shuffle = shuffle, num_workers = min(8, os.cpu_count()))
+        if use_sampler:
+            print('iterate', len(data))
+            weights = torch.ones(len(data))
+            num_samples = len(data)
+            sampler = torch.utils.data.WeightedRandomSampler(weights, num_samples)
+            return torch.utils.data.DataLoader(dataset, batch_size = args.batch_size,  num_workers = min(8, os.cpu_count()), sampler = sampler) #shuffle = shuffle,
+        else:
+            return torch.utils.data.DataLoader(dataset, batch_size = args.batch_size,shuffle = shuffle,  num_workers = min(8, os.cpu_count()))
+
     else:
         return Dataset(data, target, transforms, shuffle = shuffle)
 
@@ -333,7 +342,7 @@ def miniImageNet(use_hd = True):
     if args.episodic:
         train_loader = episodic_iterator(datasets["train"][0], 64, transforms = train_transforms, forcecpu = True, use_hd = True)
     else:
-        train_loader = iterator(datasets["train"][0], datasets["train"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
+        train_loader = iterator(datasets["train"][0], datasets["train"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd, use_sampler=True)
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     val_loader = iterator(datasets["validation"][0], datasets["validation"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)

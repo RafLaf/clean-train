@@ -27,6 +27,7 @@ if args.ema > 0:
 if args.wandb:
     import wandb
 
+old_snr = 0
 
 
 ### global variables that are used by the train function
@@ -44,13 +45,14 @@ def crit(output, features, target):
         return criterion(output, target)
 
 ### main train function
-def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = False):
+def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = False, novel_loader = None):
     model.train()
-    global last_update
+    global last_update, old_snr
     losses, total = 0., 0
     
     for batch_idx, (data, target) in enumerate(train_loader):
-            
+        model.train()
+
         data, target = data.to(args.device), target.to(args.device)
 
         # reset gradients
@@ -110,6 +112,7 @@ def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = 
         # update parameters
         optimizer.step()
         scheduler.step()
+        
         if args.ema > 0:
             ema.update()
 
@@ -127,7 +130,21 @@ def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = 
 
         if few_shot and total >= args.dataset_size and args.dataset_size > 0:
             break
-            
+        model.eval()
+        feat_classa  = few_shot_eval.get_novel(model,novel_loader, args.novelclassA)
+        feat_classb  = few_shot_eval.get_novel(model,novel_loader, args.novelclassB) 
+        snr = SNR_complet(feat_classa,feat_classb)
+        if snr > old_snr:
+            print('better')
+            weights = train_loader.sampler.weights
+            weights[batch_idx*args.batch_size: (batch_idx+1)*args.batch_size]+=1
+            train_loader.sampler.weights = weights
+            np.save('notebooks/weights.npy',train_loader.sampler.weights.cpu().detach().numpy())
+        old_snr = snr
+        
+        
+        
+
     if args.wandb:
         wandb.log({"epoch":epoch, "train_loss": losses / total})
 
@@ -212,7 +229,7 @@ def train_complete(model, loaders, mixup = False):
             else:
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = list(np.array(args.milestones) * length), gamma = args.gamma)
 
-        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs)        
+        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs , novel_loader = novel_loader)        
         
         if args.save_model != "" and not few_shot:
             if len(args.devices) == 1:
@@ -410,7 +427,7 @@ for i in range(args.runs):
             )
         wandb.log({"run": i})
         wandb.log({'base': args.base, 'val': args.val , 'novel': args.novel, 'run' : i })
-        wandb.log({'rmclass': args.rmclass })
+        #wandb.log({'rmclass': args.rmclass })
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
