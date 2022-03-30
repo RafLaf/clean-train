@@ -130,14 +130,13 @@ class EpisodicDataset():
 
 def iterator(data, target, transforms, forcecpu = False, shuffle = True, use_hd = False, use_sampler = False):
     if args.dataset_device == "cpu" or forcecpu:
-
         dataset = CPUDataset(data, target, transforms, use_hd = use_hd)
         if use_sampler:
             print('iterate', len(data))
             weights = torch.ones(len(data))
             num_samples = len(data)
             sampler = torch.utils.data.WeightedRandomSampler(weights, len(data))
-            return torch.utils.data.DataLoader(dataset,  num_workers = min(8, os.cpu_count()), sampler = sampler) #shuffle = shuffle,
+            return torch.utils.data.DataLoader(dataset,  batch_size = args.batch_size ,num_workers = min(8, os.cpu_count()), sampler = sampler) #shuffle = shuffle,
         else:
             return torch.utils.data.DataLoader(dataset, batch_size = args.batch_size,shuffle = shuffle,  num_workers = min(8, os.cpu_count()))
 
@@ -346,7 +345,12 @@ def miniImageNet(use_hd = True):
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     val_loader = iterator(datasets["validation"][0], datasets["validation"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
-    return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
+
+    idA = datasets['test'][1] == args.novelclassA+80
+    idB = datasets['test'][1] == args.novelclassB+80
+    classA_loader = iterator([datasets["test"][0][i] for i in np.where(idA)[0]], datasets["test"][1][idA], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    classB_loader = iterator([datasets["test"][0][i] for i in np.where(idB)[0]], datasets["test"][1][idB], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    return (train_loader, train_clean, val_loader, test_loader,classA_loader, classB_loader ), [3, 84, 84], (64, 16, 20, 600), True, False
 
 
 def tieredImageNet(use_hd=True):

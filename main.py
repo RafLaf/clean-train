@@ -45,7 +45,7 @@ def crit(output, features, target):
         return criterion(output, target)
 
 ### main train function
-def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = False, novel_loader = None):
+def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = False, classAnovel = None, classBnovel= None):
     model.train()
     global last_update, L_snr , old_snr
     L_snr = []
@@ -131,10 +131,11 @@ def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = 
 
         if few_shot and total >= args.dataset_size and args.dataset_size > 0:
             break
+        
         model.eval()
         with torch.no_grad():
-            feat_classa  = few_shot_eval.get_novel(model,novel_loader, args.novelclassA)
-            feat_classb  = few_shot_eval.get_novel(model,novel_loader, args.novelclassB) 
+            feat_classa  = few_shot_eval.get_novel(model,classAnovel)
+            feat_classb  = few_shot_eval.get_novel(model,classBnovel)
             snr = SNR_complet(feat_classa,feat_classb)
             L_snr.append(snr)
             if snr > old_snr:
@@ -144,6 +145,7 @@ def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = 
                 np.save('notebooks/weights.npy',train_loader.sampler.weights.cpu().detach().numpy())
                 print('updtated weights', epoch, batch_idx)
             old_snr = snr
+        
         
         
         
@@ -197,7 +199,7 @@ def train_complete(model, loaders, mixup = False):
     start_time = time.time()
 
     if few_shot:
-        train_loader, train_clean, val_loader, novel_loader = loaders
+        train_loader, train_clean, val_loader, novel_loader , classAnovel, classBnovel = loaders
         for i in range(len(few_shot_meta_data["best_val_acc"])):
             few_shot_meta_data["best_val_acc"][i] = 0
     else:
@@ -232,7 +234,7 @@ def train_complete(model, loaders, mixup = False):
             else:
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = list(np.array(args.milestones) * length), gamma = args.gamma)
 
-        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs , novel_loader = novel_loader)        
+        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs , classAnovel = classAnovel,classBnovel = classBnovel)        
         
         if args.save_model != "" and not few_shot:
             if len(args.devices) == 1:
