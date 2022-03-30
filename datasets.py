@@ -136,8 +136,8 @@ def iterator(data, target, transforms, forcecpu = False, shuffle = True, use_hd 
             print('iterate', len(data))
             weights = torch.ones(len(data))
             num_samples = len(data)
-            sampler = torch.utils.data.WeightedRandomSampler(weights, num_samples)
-            return torch.utils.data.DataLoader(dataset, batch_size = args.batch_size,  num_workers = min(8, os.cpu_count()), sampler = sampler) #shuffle = shuffle,
+            sampler = torch.utils.data.WeightedRandomSampler(weights, len(data))
+            return torch.utils.data.DataLoader(dataset,  num_workers = min(8, os.cpu_count()), sampler = sampler) #shuffle = shuffle,
         else:
             return torch.utils.data.DataLoader(dataset, batch_size = args.batch_size,shuffle = shuffle,  num_workers = min(8, os.cpu_count()))
 
