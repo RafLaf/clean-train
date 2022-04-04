@@ -128,3 +128,8 @@ def SNR_complet(distrib_1 , distrib_2,complete=False, soft_allocation=None):
             return marge, sig, (2*marge/sig).item()
         else:
             return (2*marge/sig).item()
+
+def update_weights(weights, target,epoch,  nb_samp = 600):
+    for x in target:
+        weights[x*nb_samp : (x+1)* nb_samp]+=np.tanh(epoch/200)  # +=10000
+    return weights

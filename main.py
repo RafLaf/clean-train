@@ -55,7 +55,7 @@ def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = 
         model.train()
 
         data, target = data.to(args.device), target.to(args.device)
-
+        #print(target.sort()[0])
         # reset gradients
         optimizer.zero_grad()
 
@@ -131,20 +131,20 @@ def train(model, train_loader, optimizer, epoch, scheduler, mixup = False, mm = 
 
         if few_shot and total >= args.dataset_size and args.dataset_size > 0:
             break
-        
-        model.eval()
-        with torch.no_grad():
-            feat_classa  = few_shot_eval.get_novel(model,classAnovel)
-            feat_classb  = few_shot_eval.get_novel(model,classBnovel)
-            snr = SNR_complet(feat_classa,feat_classb)
-            L_snr.append(snr)
-            if snr > old_snr:
-                weights = train_loader.sampler.weights
-                weights[batch_idx*args.batch_size: (batch_idx+1)*args.batch_size]+=np.tanh(epoch/200)
-                train_loader.sampler.weights = weights
-                np.save('notebooks/weights.npy',train_loader.sampler.weights.cpu().detach().numpy())
-                print('updtated weights', epoch, batch_idx)
-            old_snr = snr
+        if epoch>70:
+            model.eval()
+            with torch.no_grad():
+                feat_classa  = few_shot_eval.get_novel(model,classAnovel)
+                feat_classb  = few_shot_eval.get_novel(model,classBnovel)
+                snr = SNR_complet(feat_classa,feat_classb)
+                L_snr.append(snr)
+                if snr > old_snr:
+                    weights = train_loader.sampler.weights
+                    weights = update_weights(weights , target, epoch )
+                    train_loader.sampler.weights = weights
+                    np.save('notebooks/weights.npy',train_loader.sampler.weights.cpu().detach().numpy())
+                    print('updtated weights', epoch, batch_idx)
+                old_snr = snr
         
         
         
