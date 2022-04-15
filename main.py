@@ -294,7 +294,7 @@ if few_shot:
         if args.base.lower() in ["tieredimagenet", "cubfs"]:
             elements_train= num_classesb[3][0]
         else:
-            elements_train = num_classesb[3]
+            elements_train = None
         if args.val.lower() in ["tieredimagenet", "cubfs"]:
             elements_val = num_classesv[3][1]
         else:
@@ -350,7 +350,7 @@ def create_model():
     if args.model.lower() == "wideresnet":
         return wideresnet.WideResNet(args.feature_maps, input_shape, few_shot, args.rotations, num_classes = num_classes).to(args.device)
     if args.model.lower() == "resnet12":
-        return resnet12.ResNet12(args.feature_maps, input_shape, num_classes, few_shot, args.rotations).to(args.device)
+        return resnet12.ResNet12(args.feature_maps, input_shape, num_classes-(args.backbone!=65)*1, few_shot, args.rotations).to(args.device)
     if args.model.lower()[:3] == "mlp":
         return mlp.MLP(args.feature_maps, int(args.model[3:]), input_shape, num_classes, args.rotations, few_shot).to(args.device)
     if args.model.lower() == "s2m2r":
@@ -371,7 +371,6 @@ if args.test_features != "":
         test_features = test_features[num_classes + val_classes:]
     else:
         test_features = torch.load(filenames[0], map_location=torch.device(args.device))
-        
         train_features = test_features['base'].to(args.dataset_device)
         val_features = test_features['val'].to(args.dataset_device)
         test_features = test_features['novel'].to(args.dataset_device)
@@ -394,14 +393,14 @@ for i in range(args.runs):
         print(args)
     if args.wandb:
         tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
-        wandb.init(project="few-shot", 
+        wandb.init(project="transfer", 
             entity=args.wandb, 
             tags=tag, 
             notes=str(vars(args))
             )
         wandb.log({"run": i})
         wandb.log({'base': args.base, 'val': args.val , 'novel': args.novel, 'run' : i })
-        wandb.log({'rmclass': args.rmclass })
+        wandb.log({'backbone': int(args.backbone) })
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)

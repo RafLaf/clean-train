@@ -166,6 +166,7 @@ def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_
         train_features = torch.Tensor(0,0,0)
     val_features = get_features(model, val_loader)
     novel_features = get_features(model, novel_loader)
+    print(train_features.shape,val_features.shape, novel_features.shape)
 
     res = []
     for i in range(len(args.n_shots)):
