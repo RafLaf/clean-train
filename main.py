@@ -401,6 +401,7 @@ for i in range(args.runs):
         wandb.log({"run": i})
         wandb.log({'base': args.base, 'val': args.val , 'novel': args.novel, 'run' : i })
         wandb.log({'backbone': int(args.backbone) })
+        wandb.log({'ways': int(args.n_ways) })
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
@@ -437,6 +438,7 @@ for i in range(args.runs):
         for index in range(len(args.n_shots)):
             stats(np.array(run_stats["best_novel_acc"])[:,index], "{:d}-shot".format(args.n_shots[index]))
             if args.wandb:
+                wandb.log({"run": i+1,"val acc {:d}-shot".format(args.n_shots[index]):np.mean(np.array(run_stats["best_val_acc"])[:,index])})
                 wandb.log({"run": i+1,"test acc {:d}-shot".format(args.n_shots[index]):np.mean(np.array(run_stats["best_novel_acc"])[:,index])})
     else:
         stats(run_stats["test_acc"], "Top-1")
