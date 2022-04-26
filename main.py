@@ -27,7 +27,7 @@ import wandb
 if args.wandb:
     wandb.init(project="test64", 
            entity="raflaf", 
-           tags=['Test', args.dataset], 
+           tags=['Test',args.base, args.val, args.novel], #args.dataset], 
            notes=str(vars(args))
            )
     wandb.config = {
@@ -325,7 +325,7 @@ if few_shot:
         if args.base.lower() in ["tieredimagenet", "cubfs"]:
             elements_train= num_classesb[3][0]
         else:
-            elements_train = num_classesb[3]
+            elements_train = None
         if args.val.lower() in ["tieredimagenet", "cubfs"]:
             elements_val = num_classesv[3][1]
         else:
@@ -458,7 +458,7 @@ if args.test_features != "":
         make_a_run(num_classes)
     else:
         for i_file in range(0,num_classes+1):
-            filenames = ['/users/local/vincent/f'+str(i_file)+'1']
+            filenames = ['/users/local/r21lafar/features/transfer_mini_cub/f'+str(i_file)+'1']
             make_a_run(num_classes)
     sys.exit()
 
