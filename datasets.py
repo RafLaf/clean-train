@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import json
 import os
-
+from utils import *
 class CPUDataset():
     def __init__(self, data, targets, transforms = [], batch_size = args.batch_size, use_hd = False):
         self.data = data
@@ -27,12 +27,14 @@ class CPUDataset():
         return self.length
         
 class EpisodicCPUDataset():
-    def __init__(self, data, num_classes, transforms = [], episode_size = args.batch_size, use_hd = False):
+    def __init__(self, data, num_classes, transforms = [], episode_size = args.batch_size, use_hd = False, indices_novel = None):
         self.data = data
         if torch.is_tensor(data):
             self.length = data.shape[0]
         else:
             self.length = len(self.data)
+        
+        self.indices_novel = indices_novel
         self.episode_size = (episode_size // args.n_ways) * args.n_ways
         self.transforms = transforms
         self.use_hd = use_hd
@@ -51,17 +53,21 @@ class EpisodicCPUDataset():
         self.targets = np.array(self.targets)
         self.avg_cost, self.std_cost = None,None
         self.maxiter = 1000
+        self.features = torch.load(args.test_features, map_location = args.device)
+        self.features = preprocess(self.features[:num_classes], self.features)
+        self.features = self.features.reshape(-1, self.features.shape[-1])
+        
 
-    def get_cost(self, L_indices):
+    def get_cost(self, L_indices,novel_indices):
         L_indices = np.array(L_indices).reshape(-1)
-        if self.use_hd:
-            elt = transforms.ToTensor()(np.array(Image.open(self.data[self.indices[idx]]).convert('RGB')))
-        else:
-            elt = self.data[L_indices]
-        return np.random.random()
+        run_train = self.features[L_indices]
+        run_test = self.features[novel_indices]
+        dim = run_train.shape[-1]
+        _,cost =getProbas(run_train.reshape(1,-1,dim), run_test.reshape(1,-1,dim))
+        return cost
 
     
-    def get_cost_stats(self):
+    def get_cost_stats(self,):
         cost_list=[]
         for i in range(100):
             classes = np.random.permutation(np.arange(self.num_classes))[:args.n_ways]
@@ -71,7 +77,7 @@ class EpisodicCPUDataset():
                 class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
                 indices= (class_indices + classes[c] * (self.length // self.num_classes))
                 L_indices.append(indices)
-            cost = self.get_cost(L_indices)
+            cost = self.get_cost(L_indices,self.indices_novel)
             cost_list.append(cost)
         cost_list = np.array(cost_list)
         self.avg_cost, self.std_cost =  cost_list.mean(), cost_list.std()
@@ -187,9 +193,9 @@ def iterator(data, target, transforms, forcecpu = False, shuffle = True, use_hd 
     else:
         return Dataset(data, target, transforms, shuffle = shuffle)
 
-def episodic_iterator(data, num_classes, transforms, forcecpu = False, use_hd = False):
+def episodic_iterator(data, num_classes, transforms, forcecpu = False, use_hd = False , indices_novel =None):
     if args.dataset_device == "cpu" or forcecpu:
-        dataset = EpisodicCPUDataset(data, num_classes, transforms, use_hd = use_hd)
+        dataset = EpisodicCPUDataset(data, num_classes, transforms, use_hd = use_hd, indices_novel = indices_novel)
         return torch.utils.data.DataLoader(dataset, batch_size = (args.batch_size // args.n_ways) * args.n_ways, shuffle = False, num_workers = min(8, os.cpu_count()))
     else:
         return EpisodicDataset(data, num_classes, transforms, use_hd = use_hd)
@@ -351,7 +357,7 @@ def cifarfs(use_hd=True, data_augmentation=True):
 
     return (train_loader, train_clean, val_loader, test_loader), [3,image_size, image_size], (64, 16, 20, 600), True, False
 
-def miniImageNet(use_hd = True):
+def miniImageNet(use_hd = True, indices_novel=None):
     datasets = {}
     classes = []
     total = 60000
@@ -383,7 +389,7 @@ def miniImageNet(use_hd = True):
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
     all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84), norm)
     if args.episodic:
-        train_loader = episodic_iterator(datasets["train"][0], 64, transforms = train_transforms, forcecpu = True, use_hd = True)
+        train_loader = episodic_iterator(datasets["train"][0], 64, transforms = train_transforms, forcecpu = True, use_hd = True, indices_novel=indices_novel)
     else:
         train_loader = iterator(datasets["train"][0], datasets["train"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
@@ -646,7 +652,7 @@ def miniImageNet84():
     test_loader = iterator(test, test_targets, transforms = all_transforms, forcecpu = True, shuffle = False)
     return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
 
-def get_dataset(dataset_name):
+def get_dataset(dataset_name, indices_novel =None):
     if dataset_name.lower() == "cifar10":
         return cifar10(data_augmentation = True)
     elif dataset_name.lower() == "cifar100":
@@ -658,7 +664,7 @@ def get_dataset(dataset_name):
     elif dataset_name.lower() == "fashion":
         return fashion_mnist()
     elif dataset_name.lower() == "miniimagenet":
-        return miniImageNet()
+        return miniImageNet(indices_novel)
     elif dataset_name.lower() == "miniimagenet84":
         return miniImageNet84()
     elif dataset_name.lower() == "cubfs":

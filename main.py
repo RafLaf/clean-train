@@ -1,4 +1,5 @@
 ### global imports
+from distutils.sysconfig import customize_compiler
 import torch
 import numpy as np
 import torch.nn as nn
@@ -262,7 +263,24 @@ if (args.dataset == '' and '' in [args.base , args.val, args.novel]) or (args.da
     raise("Do you want to do cross-domain ? if NO use --dataset ;  if YES --base --val --novel ; you cannot use both ; define which dataset you want after each argument")
 
 if args.dataset != "" :
+    if args.custom_epi:
+        args.episodic = False  #get datasert info to create the novel run
+    
     loaders, input_shape, num_classes, few_shot, top_5 = datasets.get_dataset(args.dataset)
+
+    if args.custom_epi:   #create the novel 
+        args.episodic = False
+        if args.dataset.lower() in ["tieredimagenet", "cubfs"]:
+            elements_train, elements_val, elements_novel = num_classes[-1]
+            run_classes, run_indices = few_shot_eval.define_runs(args.n_ways, args.n_shots[0], args.n_queries, num_classes[2], elements_novel) + num_classes[0]+ num_classes[1]
+        else:
+            run_classes, run_indices = few_shot_eval.define_runs(args.n_ways, args.n_shots[0], args.n_queries, num_classes[2], [num_classes[-1]]*num_classes[2]) 
+            run_classes += num_classes[0]+ num_classes[1]
+        indices  = run_classes[0].unsqueeze(1)*num_classes[-1]  #find the solution tiered and cub
+        indices_novel = run_indices[0] + indices
+
+    loaders, input_shape, num_classes, few_shot, top_5 = datasets.get_dataset(args.dataset, indices_novel)
+
 
 if args.base != "" and args.val != "" and args.novel != "":
     loadersb, input_shapeb, num_classesb, few_shotb, top_5b = datasets.get_dataset(args.base)
@@ -365,7 +383,7 @@ def create_model():
     if args.model.lower() == "s2m2r":
         return s2m2.S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
-if args.test_features != "":
+if args.test_features != "" and not args.custom_epi:
     try:
         filenames = eval(args.test_features)
     except:
