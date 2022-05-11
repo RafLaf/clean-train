@@ -49,15 +49,67 @@ class EpisodicCPUDataset():
                 self.targets += [c] * (self.episode_size // args.n_ways)
         self.indices = np.array(self.indices)
         self.targets = np.array(self.targets)
+        self.avg_cost, self.std_cost = None,None
+        self.maxiter = 1000
+
+    def get_cost(self, L_indices):
+        L_indices = np.array(L_indices).reshape(-1)
+        if self.use_hd:
+            elt = transforms.ToTensor()(np.array(Image.open(self.data[self.indices[idx]]).convert('RGB')))
+        else:
+            elt = self.data[L_indices]
+        return np.random.random()
+
+    
+    def get_cost_stats(self):
+        cost_list=[]
+        for i in range(100):
+            classes = np.random.permutation(np.arange(self.num_classes))[:args.n_ways]
+            n_samples = (self.episode_size // args.n_ways)
+            L_indices = []
+            for c in range(args.n_ways):
+                class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
+                indices= (class_indices + classes[c] * (self.length // self.num_classes))
+                L_indices.append(indices)
+            cost = self.get_cost(L_indices)
+            cost_list.append(cost)
+        cost_list = np.array(cost_list)
+        self.avg_cost, self.std_cost =  cost_list.mean(), cost_list.std()
+    
+    def get_episode(self, idx):
+        if self.avg_cost == None:
+            self.get_cost_stats()
+        iter = 0
+        while True and iter< self.maxiter:
+            iter+=1
+            classes = np.random.permutation(np.arange(self.num_classes))[:args.n_ways]
+            n_samples = (self.episode_size // args.n_ways)
+            L_indices = []
+            for c in range(args.n_ways):
+                class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
+                indices= (class_indices + classes[c] * (self.length // self.num_classes))
+                L_indices.append(indices)
+            cost = self.get_cost(L_indices)
+            if cost<self.avg_cost-self.std_cost:
+                index = np.stack(L_indices)
+                return index
+        if iter==self.maxiter:
+            raise ValueError('no good run found')
 
     def generate_next_episode(self, idx):
+        n_samples = (self.episode_size // args.n_ways)
         if idx >= args.episodes_per_epoch:
             idx = 0
-        classes = np.random.permutation(np.arange(self.num_classes))[:args.n_ways]
-        n_samples = (self.episode_size // args.n_ways)
-        for c in range(args.n_ways):
-            class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
-            self.indices[idx * self.episode_size + c * n_samples: idx * self.episode_size + (c+1) * n_samples] = (class_indices + classes[c] * (self.length // self.num_classes))
+        if not args.custom_epi:
+            classes = np.random.permutation(np.arange(self.num_classes))[:args.n_ways]
+            for c in range(args.n_ways):
+                class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
+                self.indices[idx * self.episode_size + c * n_samples: idx * self.episode_size + (c+1) * n_samples] = (class_indices + classes[c] * (self.length // self.num_classes))
+        else:
+            self.indices[idx * self.episode_size : idx * self.episode_size + args.n_ways * n_samples] =  self.get_episode(idx).reshape(-1)
+
+    
+
 
     def __getitem__(self, idx):
         if idx % self.episode_size == 0:
