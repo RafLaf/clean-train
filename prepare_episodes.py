@@ -84,7 +84,7 @@ def get_cost_stats(length):
     for i in range(100):
         L_indices = random_episode()
         cost = get_cost(L_indices)
-        cost_list.append(cost)
+        cost_list.append(cost.item())
     cost_list = np.array(cost_list)
     avg_cost, std_cost =  cost_list.mean(), cost_list.std()
     return avg_cost, std_cost
@@ -97,6 +97,7 @@ def random_episode():
         class_indices = np.random.permutation(np.arange(length // num_classes[0]))[:episode_size // args.n_ways]
         indices= (class_indices + classes[c] * (length // num_classes[0]))
         L_indices.append(indices)
+    L_indices = np.array(L_indices)
     return L_indices
 
 
@@ -123,9 +124,9 @@ if not os.path.exists(file):
     episodes = []
     for idx in range(args.epochs*episode_size):
         episodes.append(get_episode( idx , avg_cost, std_cost,length))
-    episodes = np.array(episodes)
-    np.savez(file, classes = run_classes[0],indices_novel = indices_novel, episodes = episodes)
-    print('created and saved episodes for novel classes {}'.format(run_classes[0]))
+    episodes_array = np.array(episodes)
+    np.savez(file, classes = run_classes[0].cpu().detach().numpy(),indices_novel = indices_novel.cpu().detach().numpy(), episodes = episodes_array)
+    print('created and saved episodes for novel classes {}'.format(run_classes[0].cpu()))
 else:
     loaded_file = np.load(file)   
     print('loaded episodes for novel classes {}'.format(loaded_file['classes']))

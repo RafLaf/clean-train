@@ -33,8 +33,6 @@ class EpisodicCPUDataset():
             self.length = data.shape[0]
         else:
             self.length = len(self.data)
-        
-        
         self.episode_size = (episode_size // args.n_ways) * args.n_ways
         self.transforms = transforms
         self.use_hd = use_hd
@@ -56,7 +54,7 @@ class EpisodicCPUDataset():
 
     def generate_next_episode(self, idx):
         n_samples = (self.episode_size // args.n_ways)
-        if idx >= args.episodes_per_epoch and not args.custom_epi:
+        if idx >= args.episodes_per_epoch:
             idx = 0
         if not args.custom_epi:
             classes = np.random.permutation(np.arange(self.num_classes))[:args.n_ways]
@@ -64,10 +62,8 @@ class EpisodicCPUDataset():
                 class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
                 self.indices[idx * self.episode_size + c * n_samples: idx * self.episode_size + (c+1) * n_samples] = (class_indices + classes[c] * (self.length // self.num_classes))
         else:
-            self.indices[idx * self.episode_size : idx * self.episode_size + args.n_ways * n_samples] = self.episodes[idx].ravel()
-
-    
-
+            index_episode = np.random.randint(self.episodes.shape[0])
+            self.indices[idx * self.episode_size : idx * self.episode_size + args.n_ways * n_samples] = self.episodes[index_episode].ravel()
 
     def __getitem__(self, idx):
         if idx % self.episode_size == 0:
