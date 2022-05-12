@@ -50,7 +50,7 @@ class EpisodicCPUDataset():
         self.indices = np.array(self.indices)
         self.targets = np.array(self.targets)
         if args.custom_epi:
-            self.episodes = np.load('data/episodes.npz')['episodes']
+            self.episodes = np.load('data/episodes'+str(args.n_ways)+'ways'+str(args.batch_size)+'batch.npz')['episodes']
 
     def generate_next_episode(self, idx):
         n_samples = (self.episode_size // args.n_ways)

@@ -6,8 +6,11 @@ import os
 from utils import *
 import few_shot_eval
 import datasets
+from tqdm import tqdm
 
-if args.dataset != "" :
+file = 'data/episodes'+str(args.n_ways)+'ways'+str(args.batch_size)+'batch.npz'
+
+if args.dataset != "" and  not os.path.exists(file):
     if args.custom_epi:
         args.episodic = False  #get datasert info to create the novel run
         loaders, input_shape, num_classes, few_shot, top_5 = datasets.get_dataset(args.dataset)
@@ -108,13 +111,12 @@ def get_episode( idx , avg_cost, std_cost,length):
         iter+=1
         L_indices = random_episode()
         cost = get_cost(L_indices)
-        if cost<2*avg_cost-std_cost:
+        if cost<avg_cost-std_cost:
             index = np.stack(L_indices)
             return index
     if iter==maxiter:
         raise ValueError('no good run found')
 
-file = 'data/episodes.npz'
 
 if not os.path.exists(file):
     episode_size = (args.batch_size // args.n_ways) * args.n_ways
@@ -122,7 +124,7 @@ if not os.path.exists(file):
     avg_cost, std_cost = get_cost_stats(length)
 
     episodes = []
-    for idx in range(args.epochs*episode_size):
+    for idx in tqdm(range(args.epochs*episode_size)):
         episodes.append(get_episode( idx , avg_cost, std_cost,length))
     episodes_array = np.array(episodes)
     np.savez(file, classes = run_classes[0].cpu().detach().numpy(),indices_novel = indices_novel.cpu().detach().numpy(), episodes = episodes_array)
