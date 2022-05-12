@@ -34,7 +34,7 @@ class EpisodicCPUDataset():
         else:
             self.length = len(self.data)
         
-        self.indices_novel = indices_novel
+        
         self.episode_size = (episode_size // args.n_ways) * args.n_ways
         self.transforms = transforms
         self.use_hd = use_hd
@@ -57,12 +57,13 @@ class EpisodicCPUDataset():
             self.features = torch.load(args.test_features, map_location = args.device)
             self.features = preprocess(self.features[:num_classes], self.features)
             self.features = self.features.reshape(-1, self.features.shape[-1])
+            self.indices_novel = indices_novel
         
 
-    def get_cost(self, L_indices,novel_indices):
+    def get_cost(self, L_indices):
         L_indices = np.array(L_indices).reshape(-1)
         run_train = self.features[L_indices]
-        run_test = self.features[novel_indices]
+        run_test = self.features[self.indices_novel]
         dim = run_train.shape[-1]
         _,cost =getProbas(run_train.reshape(1,-1,dim), run_test.reshape(1,-1,dim))
         return cost
@@ -78,12 +79,12 @@ class EpisodicCPUDataset():
                 class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
                 indices= (class_indices + classes[c] * (self.length // self.num_classes))
                 L_indices.append(indices)
-            cost = self.get_cost(L_indices,self.indices_novel)
+            cost = self.get_cost(L_indices)
             cost_list.append(cost)
         cost_list = np.array(cost_list)
         self.avg_cost, self.std_cost =  cost_list.mean(), cost_list.std()
     
-    def get_episode(self, idx):
+    def get_episode(self, idx ):
         if self.avg_cost == None:
             self.get_cost_stats()
         iter = 0
@@ -665,7 +666,7 @@ def get_dataset(dataset_name, indices_novel =None):
     elif dataset_name.lower() == "fashion":
         return fashion_mnist()
     elif dataset_name.lower() == "miniimagenet":
-        return miniImageNet(indices_novel)
+        return miniImageNet(indices_novel=indices_novel)
     elif dataset_name.lower() == "miniimagenet84":
         return miniImageNet84()
     elif dataset_name.lower() == "cubfs":

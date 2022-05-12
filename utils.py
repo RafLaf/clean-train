@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import scipy.stats as st
 import numpy as np
 import random
+import sys
 
 ### generate random seeds
 random.seed(args.seed)
@@ -117,13 +118,13 @@ class LabelSmoothingLoss(nn.Module):
 
 
 
-def compute_optimal_transport( M, r, c, epsilon=1e-6, lam= 1):
+def compute_optimal_transport( M, r, c, epsilon=1e-6, lam= 0.01):
         r = r.to(args.device)
         c = c.to(args.device)
         n_runs, n, m = M.shape
         P = torch.exp(- lam * M)
-        P /= P.view((n_runs, -1)).sum(1).unsqueeze(1).unsqueeze(1)
-                                         
+        P /= P.view((n_runs, -1)).sum(1).unsqueeze(1).unsqueeze(1)   
+                                       
         u = torch.zeros(n_runs, n).to(args.device)
         maxiters = 1000
         iters = 1
@@ -136,6 +137,7 @@ def compute_optimal_transport( M, r, c, epsilon=1e-6, lam= 1):
             if iters == maxiters:
                 break
             iters = iters + 1
+        
         return P, torch.sum(P * M)
     
 def getProbas(train_run, test_run):
@@ -147,7 +149,6 @@ def getProbas(train_run, test_run):
     p_xj = torch.zeros_like(dist)
     r = torch.ones(n_runs, nb_samp_train)
     c = torch.ones(n_runs, nb_samp_test)
-       
     p_xj, full_cost = compute_optimal_transport(dist, r, c, epsilon=1e-6)
 
         
