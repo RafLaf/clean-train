@@ -7,6 +7,7 @@ import math
 import time
 import random
 import sys
+import copy
 print("Using pytorch version: " + torch.__version__)
 
 ### local imports
@@ -20,6 +21,24 @@ import wideresnet
 import resnet12
 import s2m2
 import mlp
+
+import wandb
+
+if args.wandb:
+    wandb.init(project="test64", 
+           entity="raflaf", 
+           tags=['Test',args.base, args.val, args.novel], #args.dataset], 
+           notes=str(vars(args))
+           )
+    wandb.config = {
+  "learning_rate": args.lr,
+  "epochs": args.epochs,
+  "batch_size": args.batch_size,
+  "backbone": args.model,
+  "rotations": args.rotations,
+  "mixup": args.mixup,
+  "manifold_mixup":args.manifold_mixup
+}
 print("models.")
 if args.ema > 0:
     from torch_ema import ExponentialMovingAverage
@@ -28,9 +47,12 @@ if args.wandb:
     import wandb
 
 
+print(args.test_features)
 
 ### global variables that are used by the train function
 last_update, criterion = 0, torch.nn.CrossEntropyLoss()
+
+
 
 ### function to either use criterion based on output and target or criterion_episodic based on features and target
 def crit(output, features, target):
@@ -251,7 +273,7 @@ def train_complete(model, loaders, mixup = False):
                 ema.restore()
         else:
             test_stats = test(model, test_loader)
-
+            
     if few_shot:
         return few_shot_meta_data
     else:
@@ -303,7 +325,7 @@ if few_shot:
         if args.base.lower() in ["tieredimagenet", "cubfs"]:
             elements_train= num_classesb[3][0]
         else:
-            elements_train = num_classesb[3]
+            elements_train = None
         if args.val.lower() in ["tieredimagenet", "cubfs"]:
             elements_val = num_classesv[3][1]
         else:
@@ -365,6 +387,64 @@ def create_model():
     if args.model.lower() == "s2m2r":
         return s2m2.S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
+
+def make_a_run(num_classes):
+    if args.dataset != '':
+        #print(num_classes +args.nb_of_rm , '->', num_classes) 
+        test_features = torch.cat([torch.load(fn, map_location=torch.device(args.device)).to(args.dataset_device) for fn in filenames], dim = 2)
+        print(test_features[0,0,0])
+        print("Testing features of shape", test_features.shape)
+        train_features = test_features[:num_classes]
+        val_features = test_features[num_classes:num_classes + val_classes]
+        test_features = test_features[-20:]
+    else:
+        test_features = torch.load(filenames[0], map_location=torch.device(args.device))
+        train_features = test_features['base'].to(args.dataset_device)
+        val_features = test_features['val'].to(args.dataset_device)
+        test_features = test_features['novel'].to(args.dataset_device)
+        print("Testing features of shape", 'base', train_features.shape, 'val', val_features.shape, 'novel', test_features.shape)
+        print("if it fails please make sure --base --val --novel do correspond to the shapes above or (memory error) lower --batch-fs")
+    if not args.transductive:
+        for i in range(len(args.n_shots)):
+            if not args.forced_class and not args.force_couples:
+                val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data)
+                print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+                print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
+                if args.wandb!='':
+                    if args.nb_of_rm!=0:
+                        wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'i_file' :i_file   })
+                    else:
+                        wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf })
+            elif args.forced_class:
+                for force_class in range(test_features.shape[0]):
+                    val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
+                    print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+                    print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
+                    if args.wandb!='':
+                        if args.nb_of_rm!=0:
+                            wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'i_file' :i_file ,'forced_class': force_class  })
+                        else:
+                            wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'forced_class': force_class  })
+            elif args.force_couples: 
+                nb_novel = 20
+                print(num_classes)
+                num_classes = 63
+                for ind1 in range(nb_novel):
+                    for ind2 in range(nb_novel):
+                        force_class = [ind1,ind2]
+                        val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
+                        print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+                        print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
+                        if args.wandb!='':
+                            if args.nb_of_rm!=0:
+                                wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf' :val_conf,'i_file' :i_file ,'ind1': ind1 , 'ind2': ind2   })
+                            else:
+                                wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf': val_conf,'ind1': ind1 , 'ind2': ind2  })
+    else:               
+        for i in range(len(args.n_shots)):
+            val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, transductive = True)
+            print("Transductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+
 if args.test_features != "":
     try:
         filenames = eval(args.test_features)
@@ -373,34 +453,23 @@ if args.test_features != "":
     if isinstance(filenames, str):
         filenames = [filenames]
     if args.dataset != '':
-        test_features = torch.cat([torch.load(fn, map_location=torch.device(args.device)).to(args.dataset_device) for fn in filenames], dim = 2)
-        print("Testing features of shape", test_features.shape)
-        train_features = test_features[:num_classes]
-        val_features = test_features[num_classes:num_classes + val_classes]
-        test_features = test_features[num_classes + val_classes:]
+        num_classes -= args.nb_of_rm
+    if args.nb_of_rm ==0:
+        make_a_run(num_classes)
     else:
-        test_features = torch.load(filenames[0], map_location=torch.device(args.device))
-        
-        train_features = test_features['base'].to(args.dataset_device)
-        val_features = test_features['val'].to(args.dataset_device)
-        test_features = test_features['novel'].to(args.dataset_device)
-        print("Testing features of shape", 'base', train_features.shape, 'val', val_features.shape, 'novel', test_features.shape)
-        print("if it fails please make sure --base --val --novel do correspond to the shapes above or (memory error) lower --batch-fs")
-    if not args.transductive:
-        for i in range(len(args.n_shots)):
-            val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data)
-            print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
-            print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
-    else:
-        for i in range(len(args.n_shots)):
-            val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, transductive = True)
-            print("Transductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+        for i_file in range(0,num_classes+1):
+            filenames = ['/users/local/r21lafar/features/transfer_mini_cub/f'+str(i_file)+'1']
+            make_a_run(num_classes)
     sys.exit()
+
+
+
 
 for i in range(args.runs):
 
     if not args.quiet:
         print(args)
+
     if args.wandb:
         tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
         wandb.init(project="few-shot", 
@@ -414,10 +483,16 @@ for i in range(args.runs):
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
-
+    if args.wandb:
+        wandb.log({"run": i})
+    model = create_model()
+    # Optional
     if args.load_model != "":
         model.load_state_dict(torch.load(args.load_model, map_location=torch.device(args.device)))
         model.to(args.device)
+
+
+
 
     if len(args.devices) > 1:
         model = torch.nn.DataParallel(model, device_ids = args.devices)
@@ -452,6 +527,8 @@ for i in range(args.runs):
         stats(run_stats["test_acc"], "Top-1")
         if top_5:
             stats(run_stats["test_acc_top_5"], "Top-5")
+if args.wandb:
+    wandb.watch(model)
 
 if args.output != "":
     f = open(args.output, "a")
