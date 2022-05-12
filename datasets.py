@@ -53,9 +53,10 @@ class EpisodicCPUDataset():
         self.targets = np.array(self.targets)
         self.avg_cost, self.std_cost = None,None
         self.maxiter = 1000
-        self.features = torch.load(args.test_features, map_location = args.device)
-        self.features = preprocess(self.features[:num_classes], self.features)
-        self.features = self.features.reshape(-1, self.features.shape[-1])
+        if args.custom_epi:
+            self.features = torch.load(args.test_features, map_location = args.device)
+            self.features = preprocess(self.features[:num_classes], self.features)
+            self.features = self.features.reshape(-1, self.features.shape[-1])
         
 
     def get_cost(self, L_indices,novel_indices):
