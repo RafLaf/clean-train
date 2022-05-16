@@ -22,7 +22,10 @@ import resnet12
 import s2m2
 import mlp
 if args.custom_epi:
-    import prepare_episodes 
+    from prepare_episodes import * 
+    if args.dataset == 'miniimagenet':
+        the_run_classes =    loaded_file['classes']-80
+        the_run_indices =    loaded_file['indices_novel']//600 -80
 print("models.")
 if args.ema > 0:
     from torch_ema import ExponentialMovingAverage
@@ -336,7 +339,10 @@ if few_shot:
         "novel_run_indices" : novel_run_indices,
         "best_val_acc" : [0] * len(args.n_shots),
         "best_val_acc_ever" : [0] * len(args.n_shots),
-        "best_novel_acc" : [0] * len(args.n_shots)
+        "best_novel_acc" : [0] * len(args.n_shots),
+        "the_run_classes" : the_run_classes ,
+        "the_run_indices" : the_run_indices,
+        "the_run_acc" : 0
     }
 
 # can be used to compute mean and std on training data, to adjust normalizing factors
