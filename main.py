@@ -24,8 +24,8 @@ import mlp
 if args.custom_epi:
     from prepare_episodes import * 
     if args.dataset == 'miniimagenet':
-        the_run_classes =    loaded_file['classes']-80
-        the_run_indices =    loaded_file['indices_novel']%600
+        the_run_classes =   torch.tensor(np.expand_dims( loaded_file['classes']-80,0)).to(args.device)
+        the_run_indices =    torch.tensor(np.expand_dims( loaded_file['indices_novel']%600,0)).to(args.device)
         print(f'{the_run_classes=} {the_run_indices=} {the_run_classes.shape=} {the_run_indices.shape=}')
 print("models.")
 if args.ema > 0:
@@ -238,7 +238,7 @@ def train_complete(model, loaders, mixup = False):
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
                     if args.wandb:
-                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i]})
+                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , f'the_run_acc-{args.n_shots[i]}':few_shot_meta_data["the_run_acc"][i]})
 
                 print()
             else:
@@ -343,7 +343,7 @@ if few_shot:
         "best_novel_acc" : [0] * len(args.n_shots),
         "the_run_classes" : the_run_classes ,
         "the_run_indices" : the_run_indices,
-        "the_run_acc" : 0
+        "the_run_acc" :  [0] * len(args.n_shots)
     }
 
 # can be used to compute mean and std on training data, to adjust normalizing factors
