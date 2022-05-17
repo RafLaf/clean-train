@@ -129,6 +129,7 @@ if not os.path.exists(file):
     episodes_array = np.array(episodes)
     np.savez(file, classes = run_classes[0].cpu().detach().numpy(),indices_novel = indices_novel.cpu().detach().numpy(), episodes = episodes_array)
     print('created and saved episodes for novel classes {}'.format(run_classes[0].cpu()))
+    loaded_file = np.load(file)   
 else:
     loaded_file = np.load(file)   
     print('loaded episodes for novel classes {}'.format(loaded_file['classes']))
