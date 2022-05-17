@@ -190,7 +190,7 @@ def evaluate_shot(index, train_features, val_features, novel_features, few_shot_
                     torch.save(torch.cat([train_features, val_features, novel_features], dim = 0), args.save_features + str(args.n_shots[index]))
         few_shot_meta_data["best_val_acc"][index] = val_acc
         few_shot_meta_data["best_novel_acc"][index] = novel_acc
-    few_shot_meta_data["the_run_acc"][index] = softkmeans(train_features, novel_features, novel_run_classes = few_shot_meta_data["the_run_classes"] , novel_run_indices  = few_shot_meta_data["the_run_indices"],n_shots =  n_shots[index], elements_train=elements_train)
+    few_shot_meta_data["the_run_acc"][index] = softkmeans(train_features, novel_features, novel_run_classes = few_shot_meta_data["the_run_classes"] , novel_run_indices  = few_shot_meta_data["the_run_indices"],n_shots =  n_shots[index], elements_train=few_shot_meta_data["elements_train"])
     return val_acc, val_conf, novel_acc, novel_conf
 
 print("eval_few_shot, ", end='')

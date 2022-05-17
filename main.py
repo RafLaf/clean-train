@@ -25,7 +25,8 @@ if args.custom_epi:
     from prepare_episodes import * 
     if args.dataset == 'miniimagenet':
         the_run_classes =    loaded_file['classes']-80
-        the_run_indices =    loaded_file['indices_novel']//600 -80
+        the_run_indices =    loaded_file['indices_novel']%600
+        print(f'{the_run_classes=} {the_run_indices=} {the_run_classes.shape=} {the_run_indices.shape=}')
 print("models.")
 if args.ema > 0:
     from torch_ema import ExponentialMovingAverage
