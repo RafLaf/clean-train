@@ -7,11 +7,11 @@ n_runs = args.n_runs
 batch_few_shot_runs = args.batch_fs
 assert(n_runs % batch_few_shot_runs == 0)
 
-def define_runs(n_ways, n_shots, n_queries, num_classes, elements_per_class):
+def define_runs(n_ways, n_shots, n_queries, num_classes, elements_per_class, num_runs = n_runs):
     shuffle_classes = torch.LongTensor(np.arange(num_classes))
-    run_classes = torch.LongTensor(n_runs, n_ways).to(args.device)
-    run_indices = torch.LongTensor(n_runs, n_ways, n_shots + n_queries).to(args.device)
-    for i in range(n_runs):
+    run_classes = torch.LongTensor(num_runs, n_ways).to(args.device)
+    run_indices = torch.LongTensor(num_runs, n_ways, n_shots + n_queries).to(args.device)
+    for i in range(num_runs):
         run_classes[i] = torch.randperm(num_classes)[:n_ways]
         for j in range(n_ways):
             run_indices[i,j] = torch.randperm(elements_per_class[run_classes[i, j]])[:n_shots + n_queries]

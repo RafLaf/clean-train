@@ -21,11 +21,11 @@ import wideresnet
 import resnet12
 import s2m2
 import mlp
-if args.custom_epi:
+if args.custom_epi or args.episodic:
     from prepare_episodes import * 
     if args.dataset == 'miniimagenet':
-        the_run_classes =   torch.tensor(np.expand_dims( loaded_file['classes']-80,0)).to(args.device)
-        the_run_indices =    torch.tensor(np.expand_dims( loaded_file['indices_novel']%600,0)).to(args.device)
+        the_run_classes =   torch.tensor( loaded_file['classes']-80).to(args.device)
+        the_run_indices =    torch.tensor(loaded_file['indices_novel']%600).to(args.device)
         print(f'{the_run_classes=} {the_run_indices=} {the_run_classes.shape=} {the_run_indices.shape=}')
 print("models.")
 if args.ema > 0:
@@ -179,7 +179,7 @@ def test(model, test_loader):
 
 # function to train a model using args.epochs epochs
 # at each args.milestones, learning rate is multiplied by args.gamma
-def train_complete(model, loaders, mixup = False):
+def train_complete(model, loaders, mixup = False, run =0):
     global start_time
     start_time = time.time()
 
@@ -238,7 +238,7 @@ def train_complete(model, loaders, mixup = False):
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
                     if args.wandb:
-                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , f'the_run_acc-{args.n_shots[i]}':few_shot_meta_data["the_run_acc"][i][0]})
+                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , f'the_run_acc-{args.n_shots[i]}':few_shot_meta_data["the_run_acc"][i][0], 'run' : run})
 
                 print()
             else:
@@ -377,7 +377,7 @@ def create_model():
     if args.model.lower() == "s2m2r":
         return s2m2.S2M2R(args.feature_maps, input_shape, args.rotations, num_classes = num_classes).to(args.device)
 
-if args.test_features != "" and not args.custom_epi:
+if args.test_features != "":
     try:
         filenames = eval(args.test_features)
     except:
@@ -435,7 +435,7 @@ for i in range(args.runs):
         print("Number of trainable parameters in model is: " + str(np.sum([p.numel() for p in model.parameters()])))
 
     # training
-    test_stats = train_complete(model, loaders, mixup = args.mixup)
+    test_stats = train_complete(model, loaders, mixup = args.mixup, run =i)
 
     # assemble stats
     for item in test_stats.keys():
