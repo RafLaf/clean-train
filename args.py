@@ -76,7 +76,7 @@ parser.add_argument("--output", type=str, default="", help="output file to write
 parser.add_argument("--save-features", type=str, default="", help="save features to file")
 parser.add_argument("--save-model", type=str, default="", help="save model to file")
 parser.add_argument("--test-features", type=str, default="", help="test features and exit")
-parser.add_argument("--features-epi", type=str, default="", help="test features and exit")
+parser.add_argument("--features-epi", type=str, default="", help="use these features to compute optimal transport cost for episodes")
 parser.add_argument("--load-model", type=str, default="", help="load model from file")
 parser.add_argument("--seed", type=int, default=-1, help="set random seed manually, and also use deterministic approach")
 parser.add_argument("--wandb", type=str, default='', help="Report to wandb, input is the entity name")

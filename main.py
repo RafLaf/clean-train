@@ -237,8 +237,10 @@ def train_complete(model, loaders, mixup = False, run =0):
                     ema.restore()
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
+                    list_index = [str(args.n_shots[i])+'shots_run'+str(j) for j in range(the_run_classes.shape[0])]
+                    the_run_acc = dict(zip(list_index,few_shot_meta_data["the_run_acc"][i]))
                     if args.wandb:
-                        wandb.log({'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , f'the_run_acc-{args.n_shots[i]}':few_shot_meta_data["the_run_acc"][i][0], 'run' : run})
+                        wandb.log({**{'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , 'run' : run},**the_run_acc})
 
                 print()
             else:
@@ -415,7 +417,7 @@ for i in range(args.runs):
         print(args)
     if args.wandb:
         tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
-        wandb.init(project="custom_epi", 
+        runwandb = wandb.init(reinit=True,project="custom_epi", 
             entity=args.wandb, 
             tags=tag, 
             notes=str(vars(args))
@@ -461,6 +463,7 @@ for i in range(args.runs):
         stats(run_stats["test_acc"], "Top-1")
         if top_5:
             stats(run_stats["test_acc_top_5"], "Top-5")
+    runwandb.finish()
 
 if args.output != "":
     f = open(args.output, "a")
