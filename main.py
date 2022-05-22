@@ -219,7 +219,6 @@ def train_complete(model, loaders, mixup = False, run =0):
             else:
                 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = list(np.array(args.milestones) * length), gamma = args.gamma)
 
-        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs)        
         
         if args.save_model != "" and not few_shot:
             if len(args.devices) == 1:
@@ -240,7 +239,7 @@ def train_complete(model, loaders, mixup = False, run =0):
                     list_index = [str(args.n_shots[i])+'shots_run'+str(j) for j in range(the_run_classes.shape[0])]
                     the_run_acc = dict(zip(list_index,few_shot_meta_data["the_run_acc"][i]))
                     if args.wandb:
-                        wandb.log({**{'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , 'run' : run},**the_run_acc})
+                        wandb.log({**{'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , 'run' : run +1 },**the_run_acc})
 
                 print()
             else:
@@ -249,6 +248,8 @@ def train_complete(model, loaders, mixup = False, run =0):
                     print("top-1: {:.2f}%, top-5: {:.2f}%".format(100 * test_stats["test_acc"], 100 * test_stats["test_acc_top_5"]))
                 else:
                     print("test acc: {:.2f}%".format(100 * test_stats["test_acc"]))
+                    
+        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs)        
 
     if args.epochs + args.manifold_mixup <= args.skip_epochs:
         if few_shot:
@@ -416,7 +417,7 @@ for i in range(args.runs):
     if not args.quiet:
         print(args)
     if args.wandb:
-        tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
+        tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain'] + [str(i+1)]
         runwandb = wandb.init(reinit=True,project="custom_epi", 
             entity=args.wandb, 
             tags=tag, 

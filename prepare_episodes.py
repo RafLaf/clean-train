@@ -113,7 +113,7 @@ def get_episode( idx , avg_cost, std_cost, run=0):
         iter+=1
         L_indices = random_episode()
         cost = get_cost(L_indices, run)
-        if cost<avg_cost-std_cost:
+        if cost<avg_cost-1.5*std_cost:
             index = np.stack(L_indices)
             return index
     if iter==maxiter:
