@@ -21,6 +21,7 @@ import wideresnet
 import resnet12
 import s2m2
 import mlp
+import gc
 if args.custom_epi or args.episodic:
     from prepare_episodes import * 
     if args.dataset == 'miniimagenet':
@@ -236,7 +237,7 @@ def train_complete(model, loaders, mixup = False, run =0):
                     ema.restore()
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
-                    list_index = [str(args.n_shots[i])+'shots_run'+str(j) for j in range(the_run_classes.shape[0])]
+                    list_index = [str(args.n_shots[i])+'shots_run'+str(j+1) for j in range(the_run_classes.shape[0])]
                     the_run_acc = dict(zip(list_index,few_shot_meta_data["the_run_acc"][i]))
                     if args.wandb:
                         wandb.log({**{'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , 'run' : run +1 },**the_run_acc})
@@ -248,9 +249,14 @@ def train_complete(model, loaders, mixup = False, run =0):
                     print("top-1: {:.2f}%, top-5: {:.2f}%".format(100 * test_stats["test_acc"], 100 * test_stats["test_acc_top_5"]))
                 else:
                     print("test acc: {:.2f}%".format(100 * test_stats["test_acc"]))
-                    
-        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs)        
 
+        train_stats = train(model, train_loader, optimizer, (epoch + 1), scheduler, mixup = mixup, mm = epoch >= args.epochs)        
+        #for obj in gc.get_objects():
+        #    try:
+        #        if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+        #            print(type(obj), obj.size())
+        #    except:
+        #        pass
     if args.epochs + args.manifold_mixup <= args.skip_epochs:
         if few_shot:
             if args.ema > 0:
