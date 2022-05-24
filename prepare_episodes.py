@@ -128,7 +128,7 @@ if not os.path.exists(file):
     for i in range(args.runs):
         avg_cost, std_cost = get_cost_stats(run=i)
         episodes = []
-        for idx in tqdm(range(args.epochs*episode_size)):
+        for idx in tqdm(range(args.epochs*args.episodes_per_epoch)):
             episodes.append(get_episode( idx , avg_cost, std_cost,run=i))
         episodes_array = np.array(episodes)
         L_episodes=episodes_array
@@ -138,4 +138,3 @@ if not os.path.exists(file):
     loaded_file = np.load(file)   
 else:
     loaded_file = np.load(file)   
-    print('loaded episodes for novel classes {}'.format(loaded_file['classes']))

@@ -208,10 +208,14 @@ def evaluate_shot(index, train_features, val_features, novel_features, few_shot_
                     torch.save(torch.cat([train_features, val_features, novel_features], dim = 0), args.save_features + str(args.n_shots[index]))
         few_shot_meta_data["best_val_acc"][index] = val_acc
         few_shot_meta_data["best_novel_acc"][index] = novel_acc
-    if args.log_all_runs:
-        few_shot_meta_data["the_run_acc"][index] = ncm(train_features, novel_features, run_classes = few_shot_meta_data["the_run_classes"] , run_indices  = few_shot_meta_data["the_run_indices"],n_shots =  args.n_shots[index], elements_train=few_shot_meta_data["elements_train"], special_run = True)
+    if args.transductive:
+            eval_fn = softkmeans
     else:
-        few_shot_meta_data["the_run_acc"][index] = ncm(train_features, novel_features, run_classes = few_shot_meta_data["the_run_classes"][run].unsqueeze(0) , run_indices  = few_shot_meta_data["the_run_indices"][run].unsqueeze(0),n_shots =  args.n_shots[index], elements_train=few_shot_meta_data["elements_train"], special_run = True)[0]
+        eval_fn = ncm
+    if args.log_all_runs:
+        few_shot_meta_data["the_run_acc"][index] = eval_fn(train_features, novel_features, run_classes = few_shot_meta_data["the_run_classes"] , run_indices  = few_shot_meta_data["the_run_indices"],n_shots =  args.n_shots[index], elements_train=few_shot_meta_data["elements_train"], special_run = True)
+    else:
+        few_shot_meta_data["the_run_acc"][index] = eval_fn(train_features, novel_features, run_classes = few_shot_meta_data["the_run_classes"][run].unsqueeze(0) , run_indices  = few_shot_meta_data["the_run_indices"][run].unsqueeze(0),n_shots =  args.n_shots[index], elements_train=few_shot_meta_data["elements_train"], special_run = True)[0] ## we only consider the classes and indices [run] thus it is faster 
     return val_acc, val_conf, novel_acc, novel_conf
 
 print("eval_few_shot, ", end='')
