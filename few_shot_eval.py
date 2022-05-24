@@ -176,7 +176,7 @@ def eval_few_shot(train_features, val_features, novel_features, val_run_classes,
     else:
         return ncm(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), ncm(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)
 
-def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data):
+def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data, run=None):
 
     if "M" in args.preprocessing or args.save_features != '':
         train_features = get_features(model, train_clean)
@@ -187,11 +187,11 @@ def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_
 
     res = []
     for i in range(len(args.n_shots)):
-        res.append(evaluate_shot(i, train_features, val_features, novel_features, few_shot_meta_data, model = model))
+        res.append(evaluate_shot(i, train_features, val_features, novel_features, few_shot_meta_data, model = model, run=run))
 
     return res
 
-def evaluate_shot(index, train_features, val_features, novel_features, few_shot_meta_data, model = None, transductive = False):
+def evaluate_shot(index, train_features, val_features, novel_features, few_shot_meta_data, model = None, transductive = False, run =None):
     (val_acc, val_conf), (novel_acc, novel_conf) = eval_few_shot(train_features, val_features, novel_features, few_shot_meta_data["val_run_classes"][index], few_shot_meta_data["val_run_indices"][index], few_shot_meta_data["novel_run_classes"][index], few_shot_meta_data["novel_run_indices"][index], args.n_shots[index], transductive = transductive, elements_train=few_shot_meta_data["elements_train"])
     if val_acc > few_shot_meta_data["best_val_acc"][index]:
         if val_acc > few_shot_meta_data["best_val_acc_ever"][index]:
@@ -208,7 +208,10 @@ def evaluate_shot(index, train_features, val_features, novel_features, few_shot_
                     torch.save(torch.cat([train_features, val_features, novel_features], dim = 0), args.save_features + str(args.n_shots[index]))
         few_shot_meta_data["best_val_acc"][index] = val_acc
         few_shot_meta_data["best_novel_acc"][index] = novel_acc
-    few_shot_meta_data["the_run_acc"][index] = softkmeans(train_features, novel_features, run_classes = few_shot_meta_data["the_run_classes"] , run_indices  = few_shot_meta_data["the_run_indices"],n_shots =  args.n_shots[index], elements_train=few_shot_meta_data["elements_train"], special_run = True)
+    if args.log_all_runs:
+        few_shot_meta_data["the_run_acc"][index] = ncm(train_features, novel_features, run_classes = few_shot_meta_data["the_run_classes"] , run_indices  = few_shot_meta_data["the_run_indices"],n_shots =  args.n_shots[index], elements_train=few_shot_meta_data["elements_train"], special_run = True)
+    else:
+        few_shot_meta_data["the_run_acc"][index] = ncm(train_features, novel_features, run_classes = few_shot_meta_data["the_run_classes"][run].unsqueeze(0) , run_indices  = few_shot_meta_data["the_run_indices"][run].unsqueeze(0),n_shots =  args.n_shots[index], elements_train=few_shot_meta_data["elements_train"], special_run = True)[0]
     return val_acc, val_conf, novel_acc, novel_conf
 
 print("eval_few_shot, ", end='')

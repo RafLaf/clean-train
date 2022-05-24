@@ -1,4 +1,5 @@
 ### global imports
+from curses import meta
 from distutils.sysconfig import customize_compiler
 import torch
 import numpy as np
@@ -183,7 +184,6 @@ def test(model, test_loader):
 def train_complete(model, loaders, mixup = False, run =0):
     global start_time
     start_time = time.time()
-
     if few_shot:
         train_loader, train_clean, val_loader, novel_loader = loaders
         for i in range(len(few_shot_meta_data["best_val_acc"])):
@@ -232,13 +232,21 @@ def train_complete(model, loaders, mixup = False, run =0):
                 if args.ema > 0:
                     ema.store()
                     ema.copy_to()
-                res = few_shot_eval.update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data)
+                res = few_shot_eval.update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data, run=run)
                 if args.ema > 0:
                     ema.restore()
                 for i in range(len(args.n_shots)):
                     print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
-                    list_index = [str(args.n_shots[i])+'shots_run'+str(j+1) for j in range(the_run_classes.shape[0])]
-                    the_run_acc = dict(zip(list_index,few_shot_meta_data["the_run_acc"][i]))
+                    if args.log_all_runs:
+                        list_index = [str(args.n_shots[i])+'shots_run'+str(j+1) for j in range(the_run_classes.shape[0])]
+                        the_run_acc = dict(zip(list_index,few_shot_meta_data["the_run_acc"][i]))
+
+                        #---------->>>>>>>>>>>>might be some index problem here with shots <<<<<<<<<<<<<------------
+                    else:
+                        print()
+                        print('hello',few_shot_meta_data["the_run_acc"])
+                        print()
+                        the_run_acc = {f'the_run_acc-{args.n_shots[i]}' : few_shot_meta_data["the_run_acc"][i]}
                     if args.wandb:
                         wandb.log({**{'epoch':epoch, f'val-{args.n_shots[i]}':res[i][0], f'nov-{args.n_shots[i]}':res[i][2], f'best-nov-{args.n_shots[i]}':few_shot_meta_data["best_novel_acc"][i] , 'run' : run +1 },**the_run_acc})
 
@@ -352,9 +360,10 @@ if few_shot:
         "best_novel_acc" : [0] * len(args.n_shots),
         "the_run_classes" : the_run_classes ,
         "the_run_indices" : the_run_indices,
-        "the_run_acc" :  [0] * len(args.n_shots)
-    }
+        "the_run_acc" :  [0] * len(args.n_shots)}
 
+    if not args.log_all_runs:
+        few_shot_meta_data = {**few_shot_meta_data, **{'avg_perf' : [0] * len(args.n_shots) }}
 # can be used to compute mean and std on training data, to adjust normalizing factors
 if False:
     train_loader, _, _ = loaders
@@ -418,11 +427,19 @@ if args.test_features != "":
             print("Transductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
     sys.exit()
 
+if args.wandb and not args.log_all_runs:
+    tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
+    wandb.init(project="custom_epi", 
+        entity=args.wandb, 
+        tags=tag, 
+        notes=str(vars(args))
+        )
+
 for i in range(args.runs):
 
     if not args.quiet:
         print(args)
-    if args.wandb:
+    if args.wandb and args.log_all_runs:
         tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain'] + [str(i+1)]
         runwandb = wandb.init(reinit=True,project="custom_epi", 
             entity=args.wandb, 
@@ -445,6 +462,12 @@ for i in range(args.runs):
 
     # training
     test_stats = train_complete(model, loaders, mixup = args.mixup, run =i)
+    if not args.log_all_runs:
+        for k in range(len(args.n_shots)):
+            if i==0:
+                few_shot_meta_data['avg_perf'][k]= [few_shot_meta_data["the_run_acc"][k]] 
+            else:
+                few_shot_meta_data['avg_perf'][k].append(few_shot_meta_data["the_run_acc"][k]) 
 
     # assemble stats
     for item in test_stats.keys():
@@ -465,12 +488,17 @@ for i in range(args.runs):
         for index in range(len(args.n_shots)):
             stats(np.array(run_stats["best_novel_acc"])[:,index], "{:d}-shot".format(args.n_shots[index]))
             if args.wandb:
-                wandb.log({"run": i+1,"test acc {:d}-shot".format(args.n_shots[index]):np.mean(np.array(run_stats["best_novel_acc"])[:,index])})
+                if args.log_all_runs:
+                    avg_perf = {}
+                else:
+                    avg_perf = {f'avg_perf{args.n_shots[index]}': np.mean(few_shot_meta_data['avg_perf'][index])}
+                wandb.log({**{"run": i+1,"test acc {:d}-shot".format(args.n_shots[index]):np.mean(np.array(run_stats["best_novel_acc"])[:,index])},**avg_perf})
     else:
         stats(run_stats["test_acc"], "Top-1")
         if top_5:
             stats(run_stats["test_acc_top_5"], "Top-5")
-    runwandb.finish()
+    if args.log_all_runs:
+        runwandb.finish()
 
 if args.output != "":
     f = open(args.output, "a")

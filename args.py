@@ -55,7 +55,6 @@ parser.add_argument("--postprocessing", type=str, default="", help="postprocessi
 parser.add_argument("--manifold-mixup", type=int, default="0", help="deploy manifold mixup as fine-tuning as in S2M2R for the given number of epochs")
 parser.add_argument("--temperature", type=float, default=1., help="multiplication factor before softmax when using episodic")
 parser.add_argument("--ema", type=float, default=0, help="use exponential moving average with specified decay (default, 0 which means do not use)")
-parser.add_argument("--custom-epi", action="store_true", help="use desterministic randomness for reproducibility")
 
 ### pytorch options
 parser.add_argument("--device", type=str, default="cuda:0", help="device(s) to use, for multiple GPUs try cuda:ijk, will not work with 10+ GPUs")
@@ -89,6 +88,9 @@ parser.add_argument("--n-queries", type=int, default=15, help="number of few-sho
 parser.add_argument("--sample-aug", type=int, default=1, help="number of versions of support/query samples (using random crop) 1 means no augmentation")
 parser.add_argument("--ncm-loss", action="store_true", help="use ncm output instead of linear")
 parser.add_argument("--episodic", action="store_true", help="use episodic training")
+parser.add_argument("--custom-epi", action="store_true", help="use desterministic randomness for reproducibility")
+parser.add_argument("--log-all-runs", action="store_true", help="use desterministic randomness for reproducibility")
+
 parser.add_argument("--episodes-per-epoch", type=int, default=100, help="number of episodes per epoch")
 # only for transductive, used with "test-features"
 parser.add_argument("--transductive", action="store_true", help ="test features in transductive setting")
