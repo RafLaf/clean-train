@@ -26,7 +26,7 @@ import gc
 if args.custom_epi or args.episodic:
     from prepare_episodes import * 
     if args.dataset == 'miniimagenet':
-        the_run_classes =   torch.tensor( loaded_file['classes']-80).to(args.device)
+        the_run_classes =   torch.tensor(loaded_file['classes']-80).to(args.device)
         the_run_indices =    torch.tensor(loaded_file['indices_novel']%600).to(args.device)
         print(f'\n{the_run_classes=}\n  {the_run_classes.shape=}\n {the_run_indices.shape=}')
 
@@ -237,7 +237,7 @@ def train_complete(model, loaders, mixup = False, run =0):
                 if args.ema > 0:
                     ema.restore()
                 for i in range(len(args.n_shots)):
-                    print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}%) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]), end = '')
+                    print("val-{:d}: {:.2f}%, nov-{:d}: {:.2f}% ({:.2f}% ; the run acc :  {:.4f}% ) ".format(args.n_shots[i], 100 * res[i][0], args.n_shots[i], 100 * res[i][2], 100 * few_shot_meta_data["best_novel_acc"][i]*100, few_shot_meta_data['the_run_acc'][i]), end = '')
                     if args.log_all_runs:
                         list_index = [str(args.n_shots[i])+'shots_run'+str(j+1) for j in range(the_run_classes.shape[0])]
                         the_run_acc = dict(zip(list_index,few_shot_meta_data["the_run_acc"][i]))
