@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from args import *
 from utils import *
+from time import time
 
 n_runs = args.n_runs
 batch_few_shot_runs = args.batch_fs
@@ -18,7 +19,7 @@ def define_runs(n_ways, n_shots, n_queries, num_classes, elements_per_class, num
     return run_classes, run_indices
 
 def generate_runs(data, run_classes, run_indices, batch_idx):
-    n_runs, n_ways, n_samples = run_classes.shape[0], run_classes.shape[1], run_indices.shape[2]
+    n_runs = run_classes.shape[0]
     if n_runs%batch_few_shot_runs ==0:
         run_classes = run_classes[batch_idx * batch_few_shot_runs : (batch_idx + 1) * batch_few_shot_runs]
         run_indices = run_indices[batch_idx * batch_few_shot_runs : (batch_idx + 1) * batch_few_shot_runs]
@@ -31,6 +32,7 @@ def generate_runs(data, run_classes, run_indices, batch_idx):
         datas = data.unsqueeze(0).repeat(n_runs, 1, 1, 1)
     cclasses = torch.gather(datas, 1, run_classes)
     res = torch.gather(cclasses, 2, run_indices)
+    datas = None
     return res
 
 def ncm(train_features, features, run_classes, run_indices, n_shots, elements_train=None, special_run =False, batch_few_shot_runs = batch_few_shot_runs):
@@ -48,6 +50,8 @@ def ncm(train_features, features, run_classes, run_indices, n_shots, elements_tr
             distances = torch.norm(runs[:,:,n_shots:].reshape(batch_few_shot_runs, args.n_ways, 1, -1, dim) - means.reshape(batch_few_shot_runs, 1, args.n_ways, 1, dim), dim = 4, p = 2)
             winners = torch.min(distances, dim = 2)[1]
             scores += list((winners == targets).float().mean(dim = 1).mean(dim = 1).to("cpu").numpy())
+            runs,means,distances,winners =None, None, None, None
+            torch.cuda.empty_cache()
         if special_run:
             return scores
         else:
@@ -130,6 +134,8 @@ def softkmeans(train_features, features, run_classes, run_indices, n_shots, tran
             winners = torch.min(similarities, dim = 2)[1]
             winners = winners.reshape(batch_few_shot_runs, args.n_ways, -1)
             scores += list((winners == targets).float().mean(dim = 1).mean(dim = 1).to("cpu").numpy())
+            runs,means,distances,winners =None, None, None, None
+            torch.cuda.empty_cache()
         if special_run:
             return scores
         else:
@@ -177,7 +183,6 @@ def eval_few_shot(train_features, val_features, novel_features, val_run_classes,
         return ncm(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), ncm(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)
 
 def update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data, run=None):
-
     if "M" in args.preprocessing or args.save_features != '':
         train_features = get_features(model, train_clean)
     else:
