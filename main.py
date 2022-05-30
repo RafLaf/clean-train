@@ -25,10 +25,9 @@ import mlp
 import gc
 if args.custom_epi or args.episodic:
     from prepare_episodes import * 
-    if args.dataset == 'miniimagenet':
-        the_run_classes =   torch.tensor(loaded_file['classes']-80).to(args.device)
-        the_run_indices =    torch.tensor(loaded_file['indices_novel']%600).to(args.device)
-        print(f'\n{the_run_classes=}\n  {the_run_classes.shape=}\n {the_run_indices.shape=}')
+    the_run_classes =   torch.tensor(loaded_file['classes']).to(args.device)
+    the_run_indices =    torch.tensor(loaded_file['indices_novel']).to(args.device)
+    print(f'\n{the_run_classes=}\n  {the_run_classes.shape=}\n {the_run_indices.shape=}')
 
 print("models.")
 if args.ema > 0:
@@ -233,7 +232,11 @@ def train_complete(model, loaders, mixup = False, run =0):
                 if args.ema > 0:
                     ema.store()
                     ema.copy_to()
+                print()
+                print('HERE')
                 res = few_shot_eval.update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data, run=run)
+                print()
+                print('HERE2')
                 if args.ema > 0:
                     ema.restore()
                 for i in range(len(args.n_shots)):
@@ -259,7 +262,9 @@ def train_complete(model, loaders, mixup = False, run =0):
             if args.ema > 0:
                 ema.store()
                 ema.copy_to()
+            
             res = few_shot_eval.update_few_shot_meta_data(model, train_clean, novel_loader, val_loader, few_shot_meta_data)
+            
             if args.ema > 0:
                 ema.restore()
         else:
@@ -347,13 +352,14 @@ if few_shot:
         "novel_run_indices" : novel_run_indices,
         "best_val_acc" : [0] * len(args.n_shots),
         "best_val_acc_ever" : [0] * len(args.n_shots),
-        "best_novel_acc" : [0] * len(args.n_shots),
+        "best_novel_acc" : [0] * len(args.n_shots)}
+
+    if not args.log_all_runs and args.episodic:
+        few_shot_meta_data = {**few_shot_meta_data,
+         **{'list_perf' : [0] * len(args.n_shots),
         "the_run_classes" : the_run_classes ,
         "the_run_indices" : the_run_indices,
-        "the_run_acc" :  [0] * len(args.n_shots)}
-
-    if not args.log_all_runs:
-        few_shot_meta_data = {**few_shot_meta_data, **{'list_perf' : [0] * len(args.n_shots) }}
+        "the_run_acc" :  [0] * len(args.n_shots) }}
 # can be used to compute mean and std on training data, to adjust normalizing factors
 if False:
     train_loader, _, _ = loaders

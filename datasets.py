@@ -5,7 +5,10 @@ import torch
 import json
 import os
 from utils import *
-from prepare_episodes import file
+
+file = 'data/episodes'+str(args.n_ways)+'ways'+str(args.batch_size)+'batch'+str(args.runs)+'runs.npz'
+
+
 class CPUDataset():
     def __init__(self, data, targets, transforms = [], batch_size = args.batch_size, use_hd = False):
         self.data = data
@@ -28,7 +31,7 @@ class CPUDataset():
         return self.length
         
 class EpisodicCPUDataset():
-    def __init__(self, data, num_classes, transforms = [], episode_size = args.batch_size, use_hd = False, indices_novel = None):
+    def __init__(self, data, num_classes, transforms = [], episode_size = args.batch_size, use_hd = False, indices_novel = None, elements_per_class =None):
         self.data = data
         if torch.is_tensor(data):
             self.length = data.shape[0]
@@ -50,8 +53,11 @@ class EpisodicCPUDataset():
                 self.targets += [c] * (self.episode_size // args.n_ways)
         self.indices = np.array(self.indices)
         self.targets = np.array(self.targets)
+        self.elements_per_class = elements_per_class
         if args.custom_epi:
-            self.episodes = np.load(file)['episodes']
+            loaded_epi = np.load(file)
+            self.episodes_cl = loaded_epi['episodes_cl']
+            self.episodes_i = loaded_epi['episodes_i']
 
     def generate_next_episode(self, idx):
         n_samples = (self.episode_size // args.n_ways)
@@ -63,8 +69,14 @@ class EpisodicCPUDataset():
                 class_indices = np.random.permutation(np.arange(self.length // self.num_classes))[:self.episode_size // args.n_ways]
                 self.indices[idx * self.episode_size + c * n_samples: idx * self.episode_size + (c+1) * n_samples] = (class_indices + classes[c] * (self.length // self.num_classes))
         else:
-            index_episode = np.random.randint(self.episodes.shape[0])
-            self.indices[idx * self.episode_size : idx * self.episode_size + args.n_ways * n_samples] = self.episodes[index_episode].ravel()
+            index_episode = np.random.randint(self.episodes_cl.shape[0])
+            classes = self.episodes_cl[index_episode]
+            shifts = [self.elements_per_class[:c].sum() for c in classes]
+            indices_shifted=[]
+            for i in range(args.n_ways):
+                for k in range(n_samples):
+                    indices_shifted.append(shifts[i]+self.episodes_i[k])
+            self.indices[idx * self.episode_size : idx * self.episode_size + args.n_ways * n_samples] = torch.stack(indices_shifted)
 
     def __getitem__(self, idx):
         if idx % self.episode_size == 0:
@@ -142,9 +154,9 @@ def iterator(data, target, transforms, forcecpu = False, shuffle = True, use_hd 
     else:
         return Dataset(data, target, transforms, shuffle = shuffle)
 
-def episodic_iterator(data, num_classes, transforms, forcecpu = False, use_hd = False , indices_novel =None):
+def episodic_iterator(data, num_classes, transforms, forcecpu = False, use_hd = False , indices_novel =None, elements_per_class =None):
     if args.dataset_device == "cpu" or forcecpu:
-        dataset = EpisodicCPUDataset(data, num_classes, transforms, use_hd = use_hd, indices_novel = indices_novel)
+        dataset = EpisodicCPUDataset(data, num_classes, transforms, use_hd = use_hd, indices_novel = indices_novel, elements_per_class = elements_per_class)
         return torch.utils.data.DataLoader(dataset, batch_size = (args.batch_size // args.n_ways) * args.n_ways, shuffle = False, num_workers = min(8, os.cpu_count()))
     else:
         return EpisodicDataset(data, num_classes, transforms, use_hd = use_hd)
@@ -338,7 +350,7 @@ def miniImageNet(use_hd = True, indices_novel=None):
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
     all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84), norm)
     if args.episodic:
-        train_loader = episodic_iterator(datasets["train"][0], 64, transforms = train_transforms, forcecpu = True, use_hd = True, indices_novel=indices_novel)
+        train_loader = episodic_iterator(datasets["train"][0], 64, transforms = train_transforms, forcecpu = True, use_hd = True, indices_novel=indices_novel, elements_train = [600]*64 )
     else:
         train_loader = iterator(datasets["train"][0], datasets["train"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
@@ -410,7 +422,7 @@ def tieredImageNet(use_hd=True):
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
     all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84), norm)
     if args.episodic:
-        train_loader = episodic_iterator(datasets["train_base"][0], 351, transforms = train_transforms, forcecpu = True, use_hd = True)
+        train_loader = episodic_iterator(datasets["train_base"][0], 351, transforms = train_transforms, forcecpu = True, use_hd = True, elements_per_class = num_elements['train'] )
     else:
         train_loader = iterator(datasets["train_base"][0], datasets["train_base"][1], transforms = train_transforms, forcecpu = True, use_hd = use_hd)
     train_clean = iterator(datasets["train"][0], datasets["train"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
