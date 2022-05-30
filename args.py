@@ -77,7 +77,6 @@ parser.add_argument("--save-model", type=str, default="", help="save model to fi
 parser.add_argument("--test-features", type=str, default="", help="test features and exit")
 parser.add_argument("--load-model", type=str, default="", help="load model from file")
 parser.add_argument("--mean-model", nargs='+', default="", help="mean of two models model from list of file")
-parser.add_argument("--wandb", type=bool, default=False, help="Report to wandb")
 parser.add_argument("--seed", type=int, default=-1, help="set random seed manually, and also use deterministic approach")
 parser.add_argument("--wandb", type=str, default='', help="Report to wandb, input is the entity name")
 
