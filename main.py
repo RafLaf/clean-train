@@ -25,8 +25,8 @@ import mlp
 import wandb
 
 if args.wandb:
-    wandb.init(project="cleantrain", 
-           entity="raflaf", 
+    wandb.init(project="custom_epi", 
+           entity=args.wandb, 
            tags=['Test', args.dataset], 
            notes=str(vars(args))
            )
