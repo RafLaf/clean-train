@@ -518,10 +518,13 @@ def tieredImageNet_few_classes(use_hd=True):
     norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
     train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
     all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84), norm)
-    train_clean = iterator(data["train"], np.array(target["train"]), transforms = all_transforms, forcecpu = True, shuffle = True, use_hd = use_hd)
+    train_loader = iterator(data["train"], np.array(target["train"]), transforms = all_transforms, forcecpu = True, shuffle = True, use_hd = use_hd)
     val_loader = iterator(data["val"], np.array(target["val"]), transforms = all_transforms, forcecpu = True, shuffle = True, use_hd = use_hd)
     test_loader = iterator(data["test"], np.array(target["test"]), transforms = all_transforms, forcecpu = True, shuffle = True, use_hd = use_hd)
-    return (train_clean, val_loader, test_loader), [3, 84, 84],160, False, False
+    train_clean = iterator(data["train"], np.array(target["train"]), transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    val_clean = iterator(data["val"], np.array(target["val"]), transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    test_clean = iterator(data["test"], np.array(target["test"]), transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
+    return (train_loader, val_loader, test_loader, (train_clean, val_clean, test_clean)), [3, 84, 84],160, False, False
 
 
 def fc100(use_hd=True):

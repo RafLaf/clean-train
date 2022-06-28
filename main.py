@@ -181,8 +181,11 @@ def train_complete(model, loaders, mixup = False):
         for i in range(len(few_shot_meta_data["best_val_acc"])):
             few_shot_meta_data["best_val_acc"][i] = 0
     else:
-        train_loader, val_loader, test_loader = loaders
-
+        if args.dataset!='tieredimagenet_fc':
+            train_loader, val_loader, test_loader = loaders
+        else:
+            train_loader, val_loader, test_loader, clean_loaders = loaders
+            clean_train, clean_val, clean_test = clean_loaders
     lr = args.lr
 
     for epoch in range(args.epochs + args.manifold_mixup):
@@ -219,11 +222,11 @@ def train_complete(model, loaders, mixup = False):
                 torch.save(model.state_dict(), args.save_model)
             else:
                 torch.save(model.module.state_dict(), args.save_model)
-        if args.save_features != '':
+        if args.save_features != '' and epoch%10==0:
             features_fm={}
-            features_fm['train'] = few_shot_eval.get_features(model, train_loader, n_aug = args.sample_aug) 
-            features_fm['val'] = few_shot_eval.get_features(model, val_loader, n_aug = args.sample_aug) 
-            features_fm['test'] = few_shot_eval.get_features(model, test_loader, n_aug = args.sample_aug) 
+            features_fm['train'] = few_shot_eval.get_features(model, clean_train, n_aug = args.sample_aug) 
+            features_fm['val'] = few_shot_eval.get_features(model, clean_val, n_aug = args.sample_aug) 
+            features_fm['test'] = few_shot_eval.get_features(model, clean_test, n_aug = args.sample_aug) 
             torch.save(features_fm, args.save_features)
 
         if (epoch + 1) > args.skip_epochs:
@@ -431,16 +434,15 @@ for i in range(args.runs):
         model.load_state_dict(torch.load(args.load_model, map_location=torch.device(args.device)))
         model.to(args.device)
         if args.save_features!='':
-            if few_shot:
-                train_loader, train_clean, val_loader, novel_loader = loaders
-                for i in range(len(few_shot_meta_data["best_val_acc"])):
-                    few_shot_meta_data["best_val_acc"][i] = 0
-            else:
+            if args.dataset!='tieredimagenet_fc':
                 train_loader, val_loader, test_loader = loaders
+            else:
+                train_loader, val_loader, test_loader, clean_loaders = loaders
+                clean_train, clean_val, clean_test = clean_loaders
             features_fm={}
-            features_fm['train'] = few_shot_eval.get_features(model, train_loader, n_aug = args.sample_aug) 
-            features_fm['val'] = few_shot_eval.get_features(model, val_loader, n_aug = args.sample_aug) 
-            features_fm['test'] = few_shot_eval.get_features(model, test_loader, n_aug = args.sample_aug) 
+            features_fm['train'] = few_shot_eval.get_features(model, clean_train, n_aug = args.sample_aug) 
+            features_fm['val'] = few_shot_eval.get_features(model, clean_val, n_aug = args.sample_aug) 
+            features_fm['test'] = few_shot_eval.get_features(model, clean_test, n_aug = args.sample_aug) 
             torch.save(features_fm, args.save_features)
 
     if len(args.devices) > 1:
