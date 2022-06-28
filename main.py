@@ -219,7 +219,13 @@ def train_complete(model, loaders, mixup = False):
                 torch.save(model.state_dict(), args.save_model)
             else:
                 torch.save(model.module.state_dict(), args.save_model)
-        
+        if args.save_features != '':
+            features_fm={}
+            features_fm['train'] = few_shot_eval.get_features(model, train_loader, n_aug = args.sample_aug) 
+            features_fm['val'] = few_shot_eval.get_features(model, val_loader, n_aug = args.sample_aug) 
+            features_fm['test'] = few_shot_eval.get_features(model, test_loader, n_aug = args.sample_aug) 
+            torch.save(features_fm, args.save_features)
+
         if (epoch + 1) > args.skip_epochs:
             if few_shot:
                 if args.ema > 0:
@@ -424,6 +430,18 @@ for i in range(args.runs):
     if args.load_model != "":
         model.load_state_dict(torch.load(args.load_model, map_location=torch.device(args.device)))
         model.to(args.device)
+        if args.save_features!='':
+            if few_shot:
+                train_loader, train_clean, val_loader, novel_loader = loaders
+                for i in range(len(few_shot_meta_data["best_val_acc"])):
+                    few_shot_meta_data["best_val_acc"][i] = 0
+            else:
+                train_loader, val_loader, test_loader = loaders
+            features_fm={}
+            features_fm['train'] = few_shot_eval.get_features(model, train_loader, n_aug = args.sample_aug) 
+            features_fm['val'] = few_shot_eval.get_features(model, val_loader, n_aug = args.sample_aug) 
+            features_fm['test'] = few_shot_eval.get_features(model, test_loader, n_aug = args.sample_aug) 
+            torch.save(features_fm, args.save_features)
 
     if len(args.devices) > 1:
         model = torch.nn.DataParallel(model, device_ids = args.devices)
@@ -458,6 +476,7 @@ for i in range(args.runs):
         stats(run_stats["test_acc"], "Top-1")
         if top_5:
             stats(run_stats["test_acc_top_5"], "Top-5")
+        
 
 if args.output != "":
     f = open(args.output, "a")
