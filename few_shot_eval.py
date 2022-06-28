@@ -135,6 +135,8 @@ def ncm_cosine(train_features, features, run_classes, run_indices, n_shots, elem
 
 def get_features(model, loader, n_aug = args.sample_aug):
     model.eval()
+    max_offset = 1000000
+    offset = 0
     for augs in range(n_aug):
         all_features, offset, max_offset = [], 1000000, 0
         for batch_idx, (data, target) in enumerate(loader):        

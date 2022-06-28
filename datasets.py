@@ -472,14 +472,14 @@ def tieredImageNet(use_hd=True):
     return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (351, 97, 160, (num_elements['train'], num_elements['val'], num_elements['test'])), True, False
 
 def trainvaltest(data,target,count,obj,c):
-    if count<500:
+    if count<=500:
         data['train'].append(obj)
         target['train'].append(c)
 
-    if count >= 600:
+    elif count > 600 and count <=700:
         data['test'].append(obj)
         target['test'].append(c)
-    else:
+    elif count>500 and count <= 600:
         data['val'].append(obj)
         target['val'].append(c)
     return data , target
