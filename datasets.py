@@ -471,6 +471,59 @@ def tieredImageNet(use_hd=True):
     test_loader = iterator(datasets["test"][0], datasets["test"][1], transforms = all_transforms, forcecpu = True, shuffle = False, use_hd = use_hd)
     return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (351, 97, 160, (num_elements['train'], num_elements['val'], num_elements['test'])), True, False
 
+def trainvaltest(data,target,count,obj,c):
+    if count<500:
+        data['train'].append(obj)
+        target['train'].append(c)
+
+    if count >= 600:
+        data['test'].append(obj)
+        target['test'].append(c)
+    else:
+        data['val'].append(obj)
+        target['val'].append(c)
+    return data , target
+
+def tieredImageNet_few_classes(use_hd=True):
+    """
+    tiredImagenet dataset
+    Only with novel classes no few shot
+    novel: 160 classes
+    Number of samples per class: at most 130
+    Images size : 84x84
+    """
+    target = {'train': [], 'val' : [], 'test' : []}
+    data={'train': [], 'val' : [], 'test' : []}
+    num_elements = {'train', 'val', 'test'}
+    subset_path = os.path.join(args.dataset_path, 'tieredimagenet', 'test')  #only novel classes are useful for this pb
+    classe_files = os.listdir(subset_path)
+    
+    for c, classe in enumerate(classe_files):
+        files = os.listdir(os.path.join(subset_path, classe))
+        count = 0
+
+        for file in files:
+            count += 1
+            path = os.path.join(subset_path, classe, file)
+            if not use_hd:
+                image = transforms.ToTensor()(np.array(Image.open(path).convert('RGB')))
+                obj = image
+            else:
+                obj = path
+            data, target = trainvaltest(data,target,count,obj,c)
+
+        
+                 
+    print()
+    norm = transforms.Normalize(np.array([x / 255.0 for x in [125.3, 123.0, 113.9]]), np.array([x / 255.0 for x in [63.0, 62.1, 66.7]]))
+    train_transforms = torch.nn.Sequential(transforms.RandomResizedCrop(84), transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4), transforms.RandomHorizontalFlip(), norm)
+    all_transforms = torch.nn.Sequential(transforms.Resize(92), transforms.CenterCrop(84), norm) if args.sample_aug == 1 else torch.nn.Sequential(transforms.RandomResizedCrop(84), norm)
+    train_clean = iterator(data["train"], np.array(target["train"]), transforms = all_transforms, forcecpu = True, shuffle = True, use_hd = use_hd)
+    val_loader = iterator(data["val"], np.array(target["val"]), transforms = all_transforms, forcecpu = True, shuffle = True, use_hd = use_hd)
+    test_loader = iterator(data["test"], np.array(target["test"]), transforms = all_transforms, forcecpu = True, shuffle = True, use_hd = use_hd)
+    return (train_clean, val_loader, test_loader), [3, 84, 84],160, False, False
+
+
 def fc100(use_hd=True):
     """
     fc100 dataset
@@ -677,6 +730,8 @@ def get_dataset(dataset_name):
         return omniglotfs()
     elif dataset_name.lower() == "tieredimagenet":
         return tieredImageNet()
+    elif dataset_name.lower() == "tieredimagenet_fc":
+        return tieredImageNet_few_classes()
     elif dataset_name.lower() == "fc100":
         return fc100()
     else:
