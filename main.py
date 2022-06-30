@@ -404,7 +404,7 @@ def make_a_run(num_classes):
         print("Testing features of shape", test_features.shape)
         train_features = test_features[:num_classes]
         val_features = test_features[num_classes:num_classes + val_classes]
-        test_features = test_features[-20:]
+        test_features = test_features[num_classes + val_classes:]
     else:
         test_features = torch.load(filenames[0], map_location=torch.device(args.device))
         train_features = test_features['base'].to(args.dataset_device)
@@ -434,20 +434,19 @@ def make_a_run(num_classes):
                         else:
                             wandb.log({'test_acc'+str(args.n_shots[i]): test_acc  ,'val_acc'+str(args.n_shots[i]): val_acc , 'test_conf'+str(args.n_shots[i]): test_conf  ,'val_conf'+str(args.n_shots[i]): val_conf,'forced_class': force_class  })
             elif args.force_couples: 
-                nb_novel = 20
-                print(num_classes)
-                num_classes = 63
-                for ind1 in range(nb_novel):
-                    for ind2 in range(nb_novel):
-                        force_class = [ind1,ind2]
-                        val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
-                        print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
-                        print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
-                        if args.wandb!='':
-                            if args.nb_of_rm!=0:
-                                wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf' :val_conf,'i_file' :i_file ,'ind1': ind1 , 'ind2': ind2   })
-                            else:
-                                wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf': val_conf,'ind1': ind1 , 'ind2': ind2  })
+                nb_novel = 160
+                print(f'{num_classes=}')
+                num_classes = 351
+                force_class = [81,155 ] #torch.randperm(nb_novel)[:2].tolist()
+                print(f' main.py {test_features.shape=}{val_features.shape=}')
+                val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, force_class = force_class)
+                print("TEST Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * test_acc, 100 * test_conf))
+                print("VAL Inductive {:d}-shot: {:.2f}% (± {:.2f}%)".format(args.n_shots[i], 100 * val_acc, 100 * val_conf))
+                if args.wandb!='':
+                    if args.nb_of_rm!=0:
+                        wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf' :val_conf,'i_file' :i_file ,'ind1': ind1 , 'ind2': ind2   })
+                    else:
+                        wandb.log({'n_shots' : args.n_shots[i],'test_acc': test_acc  ,'val_acc': val_acc , 'test_conf': test_conf  ,'val_conf': val_conf,'ind1': ind1 , 'ind2': ind2  })
     else:               
         for i in range(len(args.n_shots)):
             val_acc, val_conf, test_acc, test_conf = few_shot_eval.evaluate_shot(i, train_features, val_features, test_features, few_shot_meta_data, transductive = True)

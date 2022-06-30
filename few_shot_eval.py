@@ -34,6 +34,7 @@ def enforce_runs(run_classes, forced_class):
 
 
 def generate_runs(data, run_classes, run_indices, batch_idx):
+    print(f'{data.shape=}{run_classes[0]=}')
     n_runs, n_ways, n_samples = run_classes.shape[0], run_classes.shape[1], run_indices.shape[2]
     run_classes = run_classes[batch_idx * batch_few_shot_runs : (batch_idx + 1) * batch_few_shot_runs]
     run_indices = run_indices[batch_idx * batch_few_shot_runs : (batch_idx + 1) * batch_few_shot_runs]
@@ -45,12 +46,13 @@ def generate_runs(data, run_classes, run_indices, batch_idx):
     return res
 
 def ncm(train_features, features, run_classes, run_indices, n_shots, elements_train=None):
-    print(run_classes[:3])
+    print('run_classes = ',run_classes.shape, run_classes[0])
+    print(f'ncm -> {features.shape=}')
     with torch.no_grad():
         dim = features.shape[2]
         targets = torch.arange(args.n_ways).unsqueeze(1).unsqueeze(0).to(args.device)
         features = preprocess(train_features, features, elements_train=elements_train)
-        print(features.shape)
+        print(f'{features.shape=}')
         scores = []
         for batch_idx in range(n_runs // batch_few_shot_runs):
             runs = generate_runs(features, run_classes, run_indices, batch_idx)
@@ -176,7 +178,6 @@ def eval_few_shot(train_features, val_features, novel_features, val_run_classes,
         return softkmeans(train_features, val_features, val_run_classes, val_run_indices, n_shots, elements_train=elements_train), softkmeans(train_features, novel_features, novel_run_classes, novel_run_indices, n_shots, elements_train=elements_train)
     else:
         if args.forced_class or args.force_couples:
-            print("hello")
             novel_run_classes_f = enforce_runs(novel_run_classes, force_class)
         else:
             novel_run_classes_f = novel_run_classes
