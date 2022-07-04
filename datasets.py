@@ -423,10 +423,10 @@ def tieredImageNet(use_hd=True):
             data_train = []
             target_train = []
         subset_path = os.path.join(args.dataset_path, 'tieredimagenet', subset)
-        classe_files = sorted(os.listdir(subset_path))
+        classe_files = os.listdir(subset_path)
         
         for c, classe in enumerate(classe_files):
-            files = sorted(os.listdir(os.path.join(subset_path, classe)))
+            files = os.listdir(os.path.join(subset_path, classe))
             count = 0
             for file in files:
                 count += 1
@@ -496,10 +496,10 @@ def tieredImageNet_few_classes(use_hd=True):
     data={'train': [], 'val' : [], 'test' : []}
     num_elements = {'train', 'val', 'test'}
     subset_path = os.path.join(args.dataset_path, 'tieredimagenet', 'test')  #only novel classes are useful for this pb
-    classe_files = sorted(os.listdir(subset_path))
+    classe_files = os.listdir(subset_path)
     
     for c, classe in enumerate(classe_files):
-        files = sorted(os.listdir(os.path.join(subset_path, classe)))
+        files = os.listdir(os.path.join(subset_path, classe))
         count = 0
 
         for file in files:
