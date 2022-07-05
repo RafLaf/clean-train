@@ -484,7 +484,7 @@ def trainvaltest(data,target,count,obj,c):
         target['val'].append(c)
     return data , target
 
-def tieredImageNet_few_classes(use_hd=True):
+def tieredImageNet_few_classes(use_hd=True, pb = None):
     """
     tiredImagenet dataset
     Only with novel classes no few shot
@@ -497,7 +497,8 @@ def tieredImageNet_few_classes(use_hd=True):
     num_elements = {'train', 'val', 'test'}
     subset_path = os.path.join(args.dataset_path, 'tieredimagenet', 'test')  #only novel classes are useful for this pb
     classe_files = os.listdir(subset_path)
-    
+    if pb!=None:
+        classe_files = [classe_files[i] for i in pb]
     for c, classe in enumerate(classe_files):
         files = os.listdir(os.path.join(subset_path, classe))
         count = 0
@@ -710,7 +711,7 @@ def miniImageNet84():
     test_loader = iterator(test, test_targets, transforms = all_transforms, forcecpu = True, shuffle = False)
     return (train_loader, train_clean, val_loader, test_loader), [3, 84, 84], (64, 16, 20, 600), True, False
 
-def get_dataset(dataset_name):
+def get_dataset(dataset_name, pb=None):
     if dataset_name.lower() == "cifar10":
         return cifar10(data_augmentation = True)
     elif dataset_name.lower() == "cifar100":
@@ -734,7 +735,7 @@ def get_dataset(dataset_name):
     elif dataset_name.lower() == "tieredimagenet":
         return tieredImageNet()
     elif dataset_name.lower() == "tieredimagenet_fc":
-        return tieredImageNet_few_classes()
+        return tieredImageNet_few_classes(pb=pb)
     elif dataset_name.lower() == "fc100":
         return fc100()
     else:

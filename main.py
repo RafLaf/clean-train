@@ -415,17 +415,20 @@ if args.test_features != "":
     sys.exit()
 
 for i in range(args.runs):
-
+    if args.loadPB != '':
+        pbs = torch.load(args.loadPB, map_location =args.device)
+        loaders, input_shape, num_classes, few_shot, top_5 = datasets.get_dataset(args.dataset, pb = pbs[i].tolist())
+        args.n_ways = len(pbs[i].tolist())
     if not args.quiet:
         print(args)
     if args.wandb:
-        tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain']
-        wandb.init(project=args.wandbProjectName, 
+        tag = (args.dataset != '')*[args.dataset] + (args.dataset == '')*['cross-domain'] 
+        wandb_run = wandb.init(project=args.wandbProjectName, 
             entity=args.wandb, 
             tags=tag, 
-            config=vars(args)
-            )
-
+            config=vars(args),
+            reinit=True)
+    wandb.log({'pb' : pbs[i].tolist()})
     model = create_model()
     if args.ema > 0:
         ema = ExponentialMovingAverage(model.parameters(), decay=args.ema)
@@ -479,7 +482,7 @@ for i in range(args.runs):
         if top_5:
             stats(run_stats["test_acc_top_5"], "Top-5")
         
-
+    wandb_run.finish()
 if args.output != "":
     f = open(args.output, "a")
     f.write("\n")
